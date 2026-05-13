@@ -46,17 +46,7 @@ public class TarjetaService {
     }
 
     public Tarjeta solicitarTarjeta(String numDocumento, String nombreTitular, String tipoTarjeta) {
-        boolean esVisa = rnd.nextBoolean();
-        StringBuilder sb = new StringBuilder();
-        if (esVisa) {
-            sb.append("4");
-        } else {
-            sb.append("5").append(1 + rnd.nextInt(5));
-        }
-        while (sb.length() < 16) {
-            sb.append(rnd.nextInt(10));
-        }
-        String numGenerado = sb.toString();
+        String numGenerado = generarNumeroTarjeta();
         String marca    = detectarMarca(numGenerado);
         String ultimos4 = numGenerado.substring(12);
 
@@ -203,6 +193,19 @@ public class TarjetaService {
         tarjeta.setEstadoTarjeta(getEstado(ESTADO_ELIMINADA));
         tarjetaRepository.save(tarjeta);
         log.info("Tarjeta desactivada: {}", tarjetaId);
+    }
+
+    private String generarNumeroTarjeta() {
+        StringBuilder sb = new StringBuilder();
+        if (rnd.nextBoolean()) {
+            sb.append("4");
+        } else {
+            sb.append("5").append(1 + rnd.nextInt(5));
+        }
+        while (sb.length() < 16) {
+            sb.append(rnd.nextInt(10));
+        }
+        return sb.toString();
     }
 
     private String detectarMarca(String numero) {
