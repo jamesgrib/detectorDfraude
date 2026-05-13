@@ -53,7 +53,7 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # requerido por SonarCloud
+          fetch-depth: 0
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
@@ -75,12 +75,6 @@ jobs:
         run: npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
-
-      - name: Subir reporte de cobertura frontend
-        uses: actions/upload-artifact@v4
-        with:
-          name: lcov-report
-          path: frontend/promptly-fluent/coverage/lcov.info
 
   sonarcloud:
     name: SonarCloud Analysis
@@ -105,21 +99,25 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 
-      - name: Compilar backend para generar bytecode
+      - name: Compilar backend para generar bytecode y cobertura
         run: ./mvnw clean test
         env:
           SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
           SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
           SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
 
-      - name: Descargar reporte de cobertura frontend
-        uses: actions/download-artifact@v4
-        with:
-          name: lcov-report
-          path: frontend/promptly-fluent/coverage
-
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.projectKey=jamesleonardgrijalbabolanos_fraude-detection
+            -Dsonar.organization=jamesleonardgrijalbabolanos
+            -Dsonar.sources=src/main/java
+            -Dsonar.tests=src/test/java
+            -Dsonar.java.binaries=target/classes
+            -Dsonar.exclusions=frontend/**
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            -Dsonar.coverage.exclusions=**/config/**,**/*Application.java,**/model/**,**/repository/**,**/dto/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
