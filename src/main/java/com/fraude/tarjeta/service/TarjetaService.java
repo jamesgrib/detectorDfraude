@@ -28,7 +28,6 @@ public class TarjetaService {
     private static final String ESTADO_ELIMINADA = "ELIMINADA";
     private static final String TARJETA_NO_ENCONTRADA = "Tarjeta no encontrada";
 
-    // Instancia reutilizable de Random
     private final Random rnd = new Random();
 
     private final TarjetaRepository tarjetaRepository;
@@ -93,6 +92,14 @@ public class TarjetaService {
         }
 
         tarjeta.setEstadoTarjeta(getEstado(ESTADO_ACTIVA));
+        configurarLimitesSegunTipo(tarjeta, limiteCredito);
+
+        tarjetaRepository.save(tarjeta);
+        log.info("Tarjeta {} aprobada. Tipo: {}", tarjetaId, tarjeta.getTipoTarjeta());
+        return tarjeta;
+    }
+
+    private void configurarLimitesSegunTipo(Tarjeta tarjeta, Double limiteCredito) {
         if ("CREDITO".equals(tarjeta.getTipoTarjeta())) {
             double limite = limiteCredito != null && limiteCredito > 0 ? limiteCredito : 1_000_000.0;
             tarjeta.setLimiteCredito(limite);
@@ -100,10 +107,6 @@ public class TarjetaService {
         } else {
             tarjeta.setSaldoTarjeta(0.0);
         }
-
-        tarjetaRepository.save(tarjeta);
-        log.info("Tarjeta {} aprobada. Tipo: {}", tarjetaId, tarjeta.getTipoTarjeta());
-        return tarjeta;
     }
 
     public Tarjeta rechazarTarjeta(Integer tarjetaId, String motivo) {
@@ -125,7 +128,8 @@ public class TarjetaService {
         Tarjeta tarjeta = tarjetaRepository.findById(tarjetaId)
                 .orElseThrow(() -> new IllegalArgumentException(TARJETA_NO_ENCONTRADA));
 
-        validarTarjetaParaRecarga(tarjeta, numDocumento, monto);
+        validarMonto(monto);
+        validarTarjetaParaRecarga(tarjeta, numDocumento);
 
         Cuenta cuenta = cuentaRepository.findById(numeroCuenta)
                 .orElseThrow(() -> new IllegalArgumentException("Cuenta bancaria no encontrada"));
@@ -144,7 +148,13 @@ public class TarjetaService {
         return tarjeta;
     }
 
-    private void validarTarjetaParaRecarga(Tarjeta tarjeta, String numDocumento, Double monto) {
+    private void validarMonto(Double monto) {
+        if (monto == null || monto <= 0) {
+            throw new IllegalArgumentException("El monto debe ser mayor a 0");
+        }
+    }
+
+    private void validarTarjetaParaRecarga(Tarjeta tarjeta, String numDocumento) {
         if (!tarjeta.getNumDocumento().equals(numDocumento)) {
             throw new IllegalArgumentException("La tarjeta no pertenece al usuario");
         }
@@ -153,9 +163,6 @@ public class TarjetaService {
         }
         if (!"DEBITO".equals(tarjeta.getTipoTarjeta())) {
             throw new IllegalArgumentException("Solo se pueden recargar tarjetas de débito");
-        }
-        if (monto == null || monto <= 0) {
-            throw new IllegalArgumentException("El monto debe ser mayor a 0");
         }
     }
 
@@ -196,12 +203,19 @@ public class TarjetaService {
 
     private String detectarMarca(String numero) {
         if (numero == null || numero.isEmpty()) return "UNKNOWN";
+        return resolverMarcaNoNulo(numero);
+    }
+
+    private String resolverMarcaNoNulo(String numero) {
         char first = numero.charAt(0);
         if (first == '4') return "VISA";
-        if (esMastercardPrefijo5(numero, first)) return "MASTERCARD";
-        if (esMastercardPrefijo2(numero, first)) return "MASTERCARD";
+        if (esMastercard(numero, first)) return "MASTERCARD";
         if (esAmex(numero, first)) return "AMEX";
         return "UNKNOWN";
+    }
+
+    private boolean esMastercard(String numero, char first) {
+        return esMastercardPrefijo5(numero, first) || esMastercardPrefijo2(numero, first);
     }
 
     private boolean esMastercardPrefijo5(String numero, char first) {
@@ -212,11 +226,14 @@ public class TarjetaService {
 
     private boolean esMastercardPrefijo2(String numero, char first) {
         if (first != '2' || numero.length() < 4) return false;
+        return esRangoMastercardPrefijo2(numero.substring(0, 4));
+    }
+
+    private boolean esRangoMastercardPrefijo2(String prefix4) {
         try {
-            int prefix = Integer.parseInt(numero.substring(0, 4));
+            int prefix = Integer.parseInt(prefix4);
             return prefix >= 2221 && prefix <= 2720;
         } catch (NumberFormatException ignored) {
-            // número no parseable
             return false;
         }
     }

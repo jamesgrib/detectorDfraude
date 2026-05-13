@@ -60,11 +60,13 @@ public class TransaccionService {
         if (transaccion.getMonto() == null || transaccion.getMonto() <= 0) {
             throw new IllegalArgumentException("Monto debe ser mayor a 0");
         }
-        if (transaccion.getCuentaOrigenId() == null || transaccion.getCuentaOrigenId().isEmpty()) {
-            throw new IllegalArgumentException("Cuenta origen es requerida");
-        }
-        if (transaccion.getCuentaDestinoId() == null || transaccion.getCuentaDestinoId().isEmpty()) {
-            throw new IllegalArgumentException("Cuenta destino es requerida");
+        validarCuentaId(transaccion.getCuentaOrigenId(), "Cuenta origen es requerida");
+        validarCuentaId(transaccion.getCuentaDestinoId(), "Cuenta destino es requerida");
+    }
+
+    private void validarCuentaId(String cuentaId, String mensaje) {
+        if (cuentaId == null || cuentaId.isEmpty()) {
+            throw new IllegalArgumentException(mensaje);
         }
     }
 
