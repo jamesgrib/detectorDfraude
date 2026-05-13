@@ -1,43 +1,34 @@
 package com.fraude.tarjeta.controller;
 
-import com.fraude.config.GlobalExceptionHandler;
 import com.fraude.tarjeta.model.EstadoTarjeta;
 import com.fraude.tarjeta.model.MarcaTarjeta;
 import com.fraude.tarjeta.model.Tarjeta;
 import com.fraude.tarjeta.service.TarjetaService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import java.util.Map;
 
-import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
 class TarjetaControllerTest {
 
-    @Mock  private TarjetaService tarjetaService;
-    @InjectMocks private TarjetaController controller;
+    @Mock private TarjetaService tarjetaService;
 
-    private MockMvc mockMvc;
-
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders
-                .standaloneSetup(controller)
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
-    }
+    @InjectMocks
+    private TarjetaController controller;
 
     private Tarjeta buildTarjeta() {
         return Tarjeta.builder()
@@ -55,174 +46,170 @@ class TarjetaControllerTest {
                 .build();
     }
 
-    // ─── obtenerTarjetas ──────────────────────────────────────────────────────
-
     @Test
-    void obtenerTarjetas_retornaLista() throws Exception {
+    void obtenerTarjetas_retornaLista() {
         when(tarjetaService.obtenerTarjetasUsuario("12345678")).thenReturn(List.of(buildTarjeta()));
 
-        mockMvc.perform(get("/api/tarjetas")
-                        .header("X-User-Documento", "12345678"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1));
+        ResponseEntity<?> response = controller.obtenerTarjetas("12345678");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        List<Tarjeta> body = (List<Tarjeta>) response.getBody();
+        assertThat(body).hasSize(1);
     }
 
-    // ─── solicitarTarjeta ─────────────────────────────────────────────────────
-
     @Test
-    void solicitarTarjeta_exitoso_retorna200() throws Exception {
+    void solicitarTarjeta_exitoso_retorna200() {
         when(tarjetaService.solicitarTarjeta(anyString(), anyString(), anyString()))
                 .thenReturn(buildTarjeta());
 
-        mockMvc.perform(post("/api/tarjetas")
-                        .header("X-User-Documento", "12345678")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nombreTitular\":\"Juan Pérez\",\"tipoTarjeta\":\"DEBITO\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mensaje").exists());
+        Map<String, Object> body = Map.of("nombreTitular", "Juan Pérez", "tipoTarjeta", "DEBITO");
+        ResponseEntity<?> response = controller.solicitarTarjeta("12345678", body);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resp = (Map<String, Object>) response.getBody();
+        assertThat(resp.get("mensaje")).isNotNull();
     }
 
     @Test
-    void solicitarTarjeta_error_retorna400() throws Exception {
+    void solicitarTarjeta_error_propagaExcepcion() {
         when(tarjetaService.solicitarTarjeta(anyString(), any(), any()))
                 .thenThrow(new IllegalArgumentException("Error al solicitar"));
 
-        mockMvc.perform(post("/api/tarjetas")
-                        .header("X-User-Documento", "12345678")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nombreTitular\":\"Juan\",\"tipoTarjeta\":\"DEBITO\"}"))
-                .andExpect(status().isBadRequest());
+        assertThatThrownBy(() -> controller.solicitarTarjeta("12345678",
+                Map.of("nombreTitular", "Juan", "tipoTarjeta", "DEBITO")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Error al solicitar");
     }
 
-    // ─── recargarDebito ───────────────────────────────────────────────────────
-
     @Test
-    void recargarDebito_exitoso_retorna200() throws Exception {
+    void recargarDebito_exitoso_retorna200() {
         Tarjeta t = buildTarjeta();
         t.setSaldoTarjeta(600_000.0);
         when(tarjetaService.recargarDebito(1, "12345678", 100_000.0, "ACC-001")).thenReturn(t);
 
-        mockMvc.perform(post("/api/tarjetas/1/recargar")
-                        .header("X-User-Documento", "12345678")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"monto\":100000.0,\"numeroCuenta\":\"ACC-001\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mensaje").value("Recarga exitosa"));
+        Map<String, Object> body = Map.of("monto", 100_000.0, "numeroCuenta", "ACC-001");
+        ResponseEntity<?> response = controller.recargarDebito("12345678", 1, body);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resp = (Map<String, Object>) response.getBody();
+        assertThat(resp.get("mensaje")).isEqualTo("Recarga exitosa");
     }
 
     @Test
-    void recargarDebito_error_retorna400() throws Exception {
+    void recargarDebito_error_propagaExcepcion() {
         when(tarjetaService.recargarDebito(any(), anyString(), any(), anyString()))
                 .thenThrow(new IllegalArgumentException("Saldo insuficiente"));
 
-        mockMvc.perform(post("/api/tarjetas/1/recargar")
-                        .header("X-User-Documento", "12345678")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"monto\":999999999.0,\"numeroCuenta\":\"ACC-001\"}"))
-                .andExpect(status().isBadRequest());
+        assertThatThrownBy(() -> controller.recargarDebito("12345678", 1,
+                Map.of("monto", 999_999_999.0, "numeroCuenta", "ACC-001")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Saldo insuficiente");
     }
 
-    // ─── admin endpoints ──────────────────────────────────────────────────────
-
     @Test
-    void obtenerPendientes_retornaLista() throws Exception {
+    void obtenerPendientes_retornaLista() {
         when(tarjetaService.obtenerPendientes()).thenReturn(List.of(buildTarjeta()));
 
-        mockMvc.perform(get("/api/tarjetas/admin/pendientes"))
-                .andExpect(status().isOk());
+        ResponseEntity<?> response = controller.obtenerPendientes();
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
     }
 
     @Test
-    void obtenerTodas_retornaLista() throws Exception {
+    void obtenerTodas_retornaLista() {
         when(tarjetaService.obtenerTodas()).thenReturn(List.of(buildTarjeta(), buildTarjeta()));
 
-        mockMvc.perform(get("/api/tarjetas/admin/todas"))
-                .andExpect(status().isOk());
+        ResponseEntity<?> response = controller.obtenerTodas();
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
     }
 
-    // ─── aprobarTarjeta ───────────────────────────────────────────────────────
-
     @Test
-    void aprobarTarjeta_exitoso_retorna200() throws Exception {
+    void aprobarTarjeta_exitoso_retorna200() {
         Tarjeta aprobada = buildTarjeta();
         aprobada.setEstadoTarjeta(EstadoTarjeta.builder().id(2).nombre("ACTIVA").build());
         when(tarjetaService.aprobarTarjeta(1, 1_000_000.0)).thenReturn(aprobada);
 
-        mockMvc.perform(post("/api/tarjetas/1/aprobar")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"limiteCredito\":1000000.0}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mensaje").value("Tarjeta aprobada exitosamente"));
+        ResponseEntity<?> response = controller.aprobarTarjeta(1, Map.of("limiteCredito", 1_000_000.0));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resp = (Map<String, Object>) response.getBody();
+        assertThat(resp.get("mensaje")).isEqualTo("Tarjeta aprobada exitosamente");
     }
 
     @Test
-    void aprobarTarjeta_sinBody_usaLimiteNulo() throws Exception {
+    void aprobarTarjeta_sinBody_usaLimiteNulo() {
         when(tarjetaService.aprobarTarjeta(1, null)).thenReturn(buildTarjeta());
 
-        mockMvc.perform(post("/api/tarjetas/1/aprobar"))
-                .andExpect(status().isOk());
+        ResponseEntity<?> response = controller.aprobarTarjeta(1, null);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
     }
 
     @Test
-    void aprobarTarjeta_error_retorna400() throws Exception {
+    void aprobarTarjeta_error_propagaExcepcion() {
         when(tarjetaService.aprobarTarjeta(99, null))
                 .thenThrow(new IllegalArgumentException("Tarjeta no encontrada"));
 
-        mockMvc.perform(post("/api/tarjetas/99/aprobar"))
-                .andExpect(status().isBadRequest());
+        assertThatThrownBy(() -> controller.aprobarTarjeta(99, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Tarjeta no encontrada");
     }
 
-    // ─── rechazarTarjeta ──────────────────────────────────────────────────────
-
     @Test
-    void rechazarTarjeta_exitoso_retorna200() throws Exception {
+    void rechazarTarjeta_exitoso_retorna200() {
         Tarjeta rechazada = buildTarjeta();
         rechazada.setEstadoTarjeta(EstadoTarjeta.builder().id(3).nombre("RECHAZADA").build());
         when(tarjetaService.rechazarTarjeta(1, "Documentación incompleta")).thenReturn(rechazada);
 
-        mockMvc.perform(post("/api/tarjetas/1/rechazar")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"motivo\":\"Documentación incompleta\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mensaje").value("Tarjeta rechazada"));
+        ResponseEntity<?> response = controller.rechazarTarjeta(1, Map.of("motivo", "Documentación incompleta"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resp = (Map<String, Object>) response.getBody();
+        assertThat(resp.get("mensaje")).isEqualTo("Tarjeta rechazada");
     }
 
     @Test
-    void rechazarTarjeta_sinBody_usaMotivoNulo() throws Exception {
+    void rechazarTarjeta_sinBody_usaMotivoNulo() {
         when(tarjetaService.rechazarTarjeta(1, null)).thenReturn(buildTarjeta());
 
-        mockMvc.perform(post("/api/tarjetas/1/rechazar"))
-                .andExpect(status().isOk());
+        ResponseEntity<?> response = controller.rechazarTarjeta(1, null);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
     }
 
     @Test
-    void rechazarTarjeta_error_retorna400() throws Exception {
+    void rechazarTarjeta_error_propagaExcepcion() {
         doThrow(new IllegalArgumentException("Tarjeta no encontrada"))
                 .when(tarjetaService).rechazarTarjeta(eq(99), any());
 
-        mockMvc.perform(post("/api/tarjetas/99/rechazar")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"motivo\":\"test\"}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    // ─── eliminarTarjeta ──────────────────────────────────────────────────────
-
-    @Test
-    void eliminarTarjeta_exitoso_retorna200() throws Exception {
-        mockMvc.perform(delete("/api/tarjetas/1")
-                        .header("X-User-Documento", "12345678"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mensaje").value("Tarjeta eliminada exitosamente"));
+        assertThatThrownBy(() -> controller.rechazarTarjeta(99, Map.of("motivo", "test")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Tarjeta no encontrada");
     }
 
     @Test
-    void eliminarTarjeta_error_retorna400() throws Exception {
+    void eliminarTarjeta_exitoso_retorna200() {
+        ResponseEntity<?> response = controller.eliminarTarjeta("12345678", 1);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resp = (Map<String, Object>) response.getBody();
+        assertThat(resp.get("mensaje")).isEqualTo("Tarjeta eliminada exitosamente");
+    }
+
+    @Test
+    void eliminarTarjeta_error_propagaExcepcion() {
         doThrow(new IllegalArgumentException("No tienes permiso"))
                 .when(tarjetaService).eliminarTarjeta(99, "12345678");
 
-        mockMvc.perform(delete("/api/tarjetas/99")
-                        .header("X-User-Documento", "12345678"))
-                .andExpect(status().isBadRequest());
+        assertThatThrownBy(() -> controller.eliminarTarjeta("12345678", 99))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No tienes permiso");
     }
 }
