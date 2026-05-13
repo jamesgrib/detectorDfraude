@@ -56,70 +56,91 @@ public class TransaccionService {
                         "Estado de transaccion no encontrado: " + nombre));
     }
 
+    private void validarInputsTransaccion(Transaccion transaccion) {
+        if (transaccion.getMonto() == null || transaccion.getMonto() <= 0) {
+            throw new IllegalArgumentException("Monto debe ser mayor a 0");
+        }
+        if (transaccion.getCuentaOrigenId() == null || transaccion.getCuentaOrigenId().isEmpty()) {
+            throw new IllegalArgumentException("Cuenta origen es requerida");
+        }
+        if (transaccion.getCuentaDestinoId() == null || transaccion.getCuentaDestinoId().isEmpty()) {
+            throw new IllegalArgumentException("Cuenta destino es requerida");
+        }
+    }
+
+    private void validarTransicionEstado(Transaccion transaccion, String nuevoEstadoNombre) {
+        if (!ESTADO_PENDIENTE.equals(transaccion.getEstadoNombre())) {
+            throw new IllegalArgumentException(
+                    "Solo se pueden validar transacciones en estado PENDIENTE");
+        }
+        if (!ESTADO_APROBADA.equals(nuevoEstadoNombre) && !ESTADO_RECHAZADA.equals(nuevoEstadoNombre)) {
+            throw new IllegalArgumentException("Estado invalido. Debe ser APROBADA o RECHAZADA");
+        }
+    }
+
+    private void actualizarSaldosCuentas(Cuenta origen, Cuenta destino, BigDecimal monto) {
+        origen.setSaldo(origen.getSaldo().subtract(monto));
+        destino.setSaldo(destino.getSaldo().add(monto));
+        cuentaRepository.save(origen);
+        cuentaRepository.save(destino);
+    }
+
+    private void aplicarTransferenciaAprobada(Cuenta origen, Cuenta destino,
+            BigDecimal monto, Transaccion transaccion) {
+        if (origen.getSaldo().compareTo(monto) < 0) {
+            log.error("Saldo insuficiente: disponible={}, requerido={}", origen.getSaldo(), monto);
+            transaccion.setEstadoTransaccion(getEstado(ESTADO_RECHAZADA));
+            return;
+        }
+        actualizarSaldosCuentas(origen, destino, monto);
+        log.info("Saldos actualizados. Origen: {}, Destino: {}", origen.getSaldo(), destino.getSaldo());
+    }
+
+    private void ejecutarTransferencia(Transaccion transaccion) {
+        Cuenta origen  = cuentaRepository.findById(transaccion.getCuentaOrigenId())
+                .orElseThrow(() -> new IllegalArgumentException("Cuenta origen no existe"));
+        Cuenta destino = cuentaRepository.findById(transaccion.getCuentaDestinoId())
+                .orElseThrow(() -> new IllegalArgumentException("Cuenta destino no existe"));
+        BigDecimal monto = BigDecimal.valueOf(transaccion.getMonto());
+        if (origen.getSaldo().compareTo(monto) < 0) {
+            throw new IllegalArgumentException("Saldo insuficiente en la cuenta origen");
+        }
+        actualizarSaldosCuentas(origen, destino, monto);
+    }
+
     @Transactional
     public Transaccion procesarTransaccion(Transaccion transaccion) {
-        try {
-            log.info("Procesando transaccion: origen={}, destino={}, monto={}",
-                    transaccion.getCuentaOrigenId(),
-                    transaccion.getCuentaDestinoId(),
-                    transaccion.getMonto());
+        log.info("Procesando transaccion: origen={}, destino={}, monto={}",
+                transaccion.getCuentaOrigenId(),
+                transaccion.getCuentaDestinoId(),
+                transaccion.getMonto());
 
-            if (transaccion.getMonto() == null || transaccion.getMonto() <= 0) {
-                throw new IllegalArgumentException("Monto debe ser mayor a 0");
-            }
-            if (transaccion.getCuentaOrigenId() == null || transaccion.getCuentaOrigenId().isEmpty()) {
-                throw new IllegalArgumentException("Cuenta origen es requerida");
-            }
-            if (transaccion.getCuentaDestinoId() == null || transaccion.getCuentaDestinoId().isEmpty()) {
-                throw new IllegalArgumentException("Cuenta destino es requerida");
-            }
+        validarInputsTransaccion(transaccion);
 
-            Cuenta origen  = cuentaRepository.findById(transaccion.getCuentaOrigenId())
-                    .orElseThrow(() -> new IllegalArgumentException("Cuenta origen no existe"));
-            Cuenta destino = cuentaRepository.findById(transaccion.getCuentaDestinoId())
-                    .orElseThrow(() -> new IllegalArgumentException("Cuenta destino no existe"));
+        Cuenta origen  = cuentaRepository.findById(transaccion.getCuentaOrigenId())
+                .orElseThrow(() -> new IllegalArgumentException("Cuenta origen no existe"));
+        Cuenta destino = cuentaRepository.findById(transaccion.getCuentaDestinoId())
+                .orElseThrow(() -> new IllegalArgumentException("Cuenta destino no existe"));
 
-            String estadoNombre = fraudeService.evaluarFraude(transaccion);
-            log.info("Estado de fraude evaluado: {}", estadoNombre);
-            transaccion.setEstadoTransaccion(getEstado(estadoNombre));
+        String estadoNombre = fraudeService.evaluarFraude(transaccion);
+        log.info("Estado de fraude evaluado: {}", estadoNombre);
+        transaccion.setEstadoTransaccion(getEstado(estadoNombre));
 
-            if (ESTADO_APROBADA.equals(estadoNombre)) {
-                BigDecimal montoTransferencia = BigDecimal.valueOf(transaccion.getMonto());
-                if (origen.getSaldo().compareTo(montoTransferencia) < 0) {
-                    log.error("Saldo insuficiente: disponible={}, requerido={}",
-                            origen.getSaldo(), montoTransferencia);
-                    transaccion.setEstadoTransaccion(getEstado(ESTADO_RECHAZADA));
-                } else {
-                    origen.setSaldo(origen.getSaldo().subtract(montoTransferencia));
-                    destino.setSaldo(destino.getSaldo().add(montoTransferencia));
-                    cuentaRepository.save(origen);
-                    cuentaRepository.save(destino);
-                    log.info("Saldos actualizados. Origen: {}, Destino: {}",
-                            origen.getSaldo(), destino.getSaldo());
-                }
-            } else {
-                log.info("Transaccion no aprobada (estado={}). Saldos no se actualizan.", estadoNombre);
-            }
-
-            if (transaccion.getTipoTransaccion() == null) {
-                transaccion.setTipoTransaccion(getTipo(null));
-            } else {
-                transaccion.setTipoTransaccion(getTipo(transaccion.getTipoTransaccion().getNombre()));
-            }
-            transaccion.setFechaCreacion(LocalDateTime.now());
-
-            Transaccion resultado = transaccionRepository.save(transaccion);
-            log.info("Transaccion guardada con ID: {}, Estado: {}",
-                    resultado.getId(), resultado.getEstadoNombre());
-            return resultado;
-
-        } catch (IllegalArgumentException e) {
-            log.error("Error de validacion: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("Error inesperado al procesar transaccion: {}", e.getMessage(), e);
-            throw new IllegalStateException("Error al procesar transaccion: " + e.getMessage());
+        if (ESTADO_APROBADA.equals(estadoNombre)) {
+            aplicarTransferenciaAprobada(origen, destino, BigDecimal.valueOf(transaccion.getMonto()), transaccion);
+        } else {
+            log.info("Transaccion no aprobada (estado={}). Saldos no se actualizan.", estadoNombre);
         }
+
+        String tipoNombre = transaccion.getTipoTransaccion() != null
+                ? transaccion.getTipoTransaccion().getNombre() : null;
+        transaccion.setTipoTransaccion(getTipo(tipoNombre));
+        transaccion.setFechaCreacion(LocalDateTime.now());
+
+        Transaccion resultado = transaccionRepository.save(transaccion);
+        log.info("Transaccion guardada con ID: {}, Estado: {}",
+                resultado.getId(), resultado.getEstadoNombre());
+        return resultado;
     }
 
     public List<Transaccion> obtenerHistorial(String cuentaId) {
@@ -165,47 +186,18 @@ public class TransaccionService {
 
     @Transactional
     public Transaccion actualizarEstadoTransaccion(Integer id, String nuevoEstadoNombre) {
-        try {
-            Transaccion transaccion = transaccionRepository.findById(id)
-                    .orElseThrow(() -> new IllegalArgumentException("Transaccion no encontrada"));
+        Transaccion transaccion = transaccionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Transaccion no encontrada"));
 
-            if (!ESTADO_PENDIENTE.equals(transaccion.getEstadoNombre())) {
-                throw new IllegalArgumentException(
-                        "Solo se pueden validar transacciones en estado PENDIENTE");
-            }
-            if (!ESTADO_APROBADA.equals(nuevoEstadoNombre)
-                    && !ESTADO_RECHAZADA.equals(nuevoEstadoNombre)) {
-                throw new IllegalArgumentException("Estado invalido. Debe ser APROBADA o RECHAZADA");
-            }
+        validarTransicionEstado(transaccion, nuevoEstadoNombre);
 
-            if (ESTADO_APROBADA.equals(nuevoEstadoNombre)) {
-                Cuenta origen  = cuentaRepository.findById(transaccion.getCuentaOrigenId())
-                        .orElseThrow(() -> new IllegalArgumentException("Cuenta origen no existe"));
-                Cuenta destino = cuentaRepository.findById(transaccion.getCuentaDestinoId())
-                        .orElseThrow(() -> new IllegalArgumentException("Cuenta destino no existe"));
-
-                BigDecimal montoTransferencia = BigDecimal.valueOf(transaccion.getMonto());
-                if (origen.getSaldo().compareTo(montoTransferencia) < 0) {
-                    throw new IllegalArgumentException("Saldo insuficiente en la cuenta origen");
-                }
-
-                origen.setSaldo(origen.getSaldo().subtract(montoTransferencia));
-                destino.setSaldo(destino.getSaldo().add(montoTransferencia));
-                cuentaRepository.save(origen);
-                cuentaRepository.save(destino);
-            }
-
-            transaccion.setEstadoTransaccion(getEstado(nuevoEstadoNombre));
-            Transaccion actualizada = transaccionRepository.save(transaccion);
-            log.info("Transaccion actualizada: id={}, estado={}", id, nuevoEstadoNombre);
-            return actualizada;
-
-        } catch (IllegalArgumentException e) {
-            log.error("Error de validacion: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("Error inesperado al actualizar estado: {}", e.getMessage(), e);
-            throw new IllegalStateException("Error al actualizar estado: " + e.getMessage());
+        if (ESTADO_APROBADA.equals(nuevoEstadoNombre)) {
+            ejecutarTransferencia(transaccion);
         }
+
+        transaccion.setEstadoTransaccion(getEstado(nuevoEstadoNombre));
+        Transaccion actualizada = transaccionRepository.save(transaccion);
+        log.info("Transaccion actualizada: id={}, estado={}", id, nuevoEstadoNombre);
+        return actualizada;
     }
 }
