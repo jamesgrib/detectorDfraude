@@ -60,26 +60,14 @@ const fmt = new Intl.NumberFormat("es-CO", {
   maximumFractionDigits: 0,
 });
 
+const ESTADO_BADGE = {
+  1: <Badge className="bg-green-100 text-green-700 border-green-300 gap-1"><CheckCircle2 size={11} /> Activa</Badge>,
+  2: <Badge className="bg-amber-100 text-amber-700 border-amber-300 gap-1"><Clock size={11} /> Pendiente aprobación</Badge>,
+  4: <Badge className="bg-red-100 text-red-700 border-red-300 gap-1"><XCircle size={11} /> Rechazada</Badge>,
+} as const;
+
 function estadoBadge(estadoId: number) {
-  if (estadoId === 1)
-    return (
-      <Badge className="bg-green-100 text-green-700 border-green-300 gap-1">
-        <CheckCircle2 size={11} /> Activa
-      </Badge>
-    );
-  if (estadoId === 2)
-    return (
-      <Badge className="bg-amber-100 text-amber-700 border-amber-300 gap-1">
-        <Clock size={11} /> Pendiente aprobación
-      </Badge>
-    );
-  if (estadoId === 4)
-    return (
-      <Badge className="bg-red-100 text-red-700 border-red-300 gap-1">
-        <XCircle size={11} /> Rechazada
-      </Badge>
-    );
-  return null;
+  return ESTADO_BADGE[estadoId as keyof typeof ESTADO_BADGE] ?? null;
 }
 
 export default function Tarjetas() {
