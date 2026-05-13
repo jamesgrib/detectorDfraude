@@ -186,30 +186,35 @@ public class TarjetaService {
     }
 
     private String detectarMarca(String numero) {
-        if (numero == null || numero.isEmpty())
-            return "UNKNOWN";
+        if (numero == null || numero.isEmpty()) return "UNKNOWN";
         char first = numero.charAt(0);
-        if (first == '4')
-            return "VISA";
-        if (first == '5' && numero.length() > 1) {
-            char second = numero.charAt(1);
-            if (second >= '1' && second <= '5')
-                return "MASTERCARD";
-        }
-        if (first == '2' && numero.length() >= 4) {
-            try {
-                int prefix = Integer.parseInt(numero.substring(0, 4));
-                if (prefix >= 2221 && prefix <= 2720)
-                    return "MASTERCARD";
-            } catch (NumberFormatException ignored) {
-                // número no parseable, continúa
-            }
-        }
-        if (first == '3' && numero.length() > 1) {
-            char second = numero.charAt(1);
-            if (second == '4' || second == '7')
-                return "AMEX";
-        }
+        if (first == '4') return "VISA";
+        if (esMastercardPrefijo5(numero, first)) return "MASTERCARD";
+        if (esMastercardPrefijo2(numero, first)) return "MASTERCARD";
+        if (esAmex(numero, first)) return "AMEX";
         return "UNKNOWN";
+    }
+
+    private boolean esMastercardPrefijo5(String numero, char first) {
+        if (first != '5' || numero.length() <= 1) return false;
+        char second = numero.charAt(1);
+        return second >= '1' && second <= '5';
+    }
+
+    private boolean esMastercardPrefijo2(String numero, char first) {
+        if (first != '2' || numero.length() < 4) return false;
+        try {
+            int prefix = Integer.parseInt(numero.substring(0, 4));
+            return prefix >= 2221 && prefix <= 2720;
+        } catch (NumberFormatException ignored) {
+            // número no parseable
+            return false;
+        }
+    }
+
+    private boolean esAmex(String numero, char first) {
+        if (first != '3' || numero.length() <= 1) return false;
+        char second = numero.charAt(1);
+        return second == '4' || second == '7';
     }
 }
