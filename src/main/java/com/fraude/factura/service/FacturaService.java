@@ -65,36 +65,37 @@ public class FacturaService {
         EstadoFactura estadoPendiente = getEstado("PENDIENTE");
 
         for (int i = 0; i < servicios.length; i++) {
-            final String servicioNombre   = servicios[i];
-            final String descripcionActual = descripciones[i];
-            final double[] rango          = rangos[i];
-            final int diasExtra           = i;
-
-            List<Factura> existentes = facturaRepository
-                    .findByNumDocumentoAndEstadoFacturaNombre(numDocumento, "PENDIENTE");
-            boolean yaExiste = existentes.stream()
-                    .anyMatch(f -> servicioNombre.equals(f.getTipoServicio()));
-
-            if (!yaExiste) {
-                // Monto aleatorio redondeado a centenas
-                long minCentenas = (long) (rango[0] / 100);
-                long maxCentenas = (long) (rango[1] / 100);
-                double montoAleatorio = (minCentenas + rnd.nextLong(maxCentenas - minCentenas + 1)) * 100.0;
-
-                Factura factura = Factura.builder()
-                        .numDocumento(numDocumento)
-                        .servicio(getServicio(servicioNombre))
-                        .descripcion(descripcionActual)
-                        .referencia("REF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
-                        .monto(montoAleatorio)
-                        .estadoFactura(estadoPendiente)
-                        .fechaVencimiento(LocalDateTime.now().plusDays(15L + diasExtra * 3L))
-                        .fechaCreacion(LocalDateTime.now())
-                        .build();
-                facturaRepository.save(factura);
-            }
+            crearFacturaSiNoExiste(numDocumento, servicios[i], descripciones[i], rangos[i], i, estadoPendiente);
         }
         return facturaRepository.findByNumDocumentoOrderByFechaVencimientoDesc(numDocumento);
+    }
+
+    private void crearFacturaSiNoExiste(String numDocumento, String servicioNombre,
+            String descripcion, double[] rango, int diasExtra, EstadoFactura estadoPendiente) {
+        List<Factura> existentes = facturaRepository
+                .findByNumDocumentoAndEstadoFacturaNombre(numDocumento, "PENDIENTE");
+        boolean yaExiste = existentes.stream()
+                .anyMatch(f -> servicioNombre.equals(f.getTipoServicio()));
+
+        if (yaExiste) {
+            return;
+        }
+
+        long minCentenas = (long) (rango[0] / 100);
+        long maxCentenas = (long) (rango[1] / 100);
+        double montoAleatorio = (minCentenas + rnd.nextLong(maxCentenas - minCentenas + 1)) * 100.0;
+
+        Factura factura = Factura.builder()
+                .numDocumento(numDocumento)
+                .servicio(getServicio(servicioNombre))
+                .descripcion(descripcion)
+                .referencia("REF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .monto(montoAleatorio)
+                .estadoFactura(estadoPendiente)
+                .fechaVencimiento(LocalDateTime.now().plusDays(15L + diasExtra * 3L))
+                .fechaCreacion(LocalDateTime.now())
+                .build();
+        facturaRepository.save(factura);
     }
 
     public List<Factura> obtenerFacturas(String numDocumento) {
@@ -145,7 +146,7 @@ public class FacturaService {
         if (!tarjeta.getNumDocumento().equals(numDocumento)) {
             throw new IllegalArgumentException("La tarjeta no pertenece al usuario");
         }
-        if (tarjeta.getEstadoId() != 1) {
+        if (!"ACTIVA".equals(tarjeta.getEstadoNombre())) {
             throw new IllegalArgumentException("La tarjeta no esta activa");
         }
 

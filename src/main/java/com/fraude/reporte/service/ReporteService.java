@@ -106,11 +106,11 @@ public class ReporteService {
                 .filter(t -> numeroCuenta.equals(t.getCuentaDestinoId())).count();
 
         double montoEnviado = transacciones.stream()
-                .filter(t -> numeroCuenta.equals(t.getCuentaOrigenId()) && t.getEstadoId() == 5)
+                .filter(t -> numeroCuenta.equals(t.getCuentaOrigenId()) && ESTADO_APROBADA.equals(t.getEstadoNombre()))
                 .mapToDouble(t -> t.getMonto() != null ? t.getMonto() : 0)
                 .sum();
         double montoRecibido = transacciones.stream()
-                .filter(t -> numeroCuenta.equals(t.getCuentaDestinoId()) && t.getEstadoId() == 5)
+                .filter(t -> numeroCuenta.equals(t.getCuentaDestinoId()) && ESTADO_APROBADA.equals(t.getEstadoNombre()))
                 .mapToDouble(t -> t.getMonto() != null ? t.getMonto() : 0)
                 .sum();
 

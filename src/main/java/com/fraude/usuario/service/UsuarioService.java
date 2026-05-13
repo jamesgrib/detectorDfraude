@@ -43,29 +43,24 @@ public class UsuarioService {
                 .orElse(null);
 
         if (usuario == null) {
-            return LoginResponse.builder()
-                    .success(false)
-                    .mensaje("Usuario no encontrado")
-                    .build();
+            return LoginResponse.builder().success(false).mensaje("Usuario no encontrado").build();
         }
-
         if (!usuario.getPasswordHash().equals(loginRequest.getPassword())) {
-            return LoginResponse.builder()
-                    .success(false)
-                    .mensaje("Contraseña incorrecta")
-                    .build();
+            return LoginResponse.builder().success(false).mensaje("Contraseña incorrecta").build();
         }
 
-        Cuenta cuenta = cuentaRepository.findByNumDocumento(loginRequest.getNumDocumento())
-                .orElse(null);
+        Cuenta cuenta = cuentaRepository.findByNumDocumento(loginRequest.getNumDocumento()).orElse(null);
+        return construirRespuestaExitosa(usuario, cuenta, loginRequest.getNumDocumento());
+    }
 
+    private LoginResponse construirRespuestaExitosa(Usuario usuario, Cuenta cuenta, String numDocumento) {
         return LoginResponse.builder()
                 .success(true)
                 .mensaje("Login exitoso")
                 .email(usuario.getEmail())
                 .nombre(usuario.getNombre())
                 .saldo(cuenta != null ? cuenta.getSaldo() : null)
-                .numeroCuenta(cuenta != null ? cuenta.getNumeroCuenta() : loginRequest.getNumDocumento())
+                .numeroCuenta(cuenta != null ? cuenta.getNumeroCuenta() : numDocumento)
                 .rol(usuario.getRol() != null ? usuario.getRol().getNombre() : null)
                 .build();
     }

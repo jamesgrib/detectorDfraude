@@ -125,6 +125,26 @@ public class TarjetaService {
         Tarjeta tarjeta = tarjetaRepository.findById(tarjetaId)
                 .orElseThrow(() -> new IllegalArgumentException(TARJETA_NO_ENCONTRADA));
 
+        validarTarjetaParaRecarga(tarjeta, numDocumento, monto);
+
+        Cuenta cuenta = cuentaRepository.findById(numeroCuenta)
+                .orElseThrow(() -> new IllegalArgumentException("Cuenta bancaria no encontrada"));
+
+        validarCuentaParaRecarga(cuenta, numDocumento, BigDecimal.valueOf(monto));
+
+        cuenta.setSaldo(cuenta.getSaldo().subtract(BigDecimal.valueOf(monto)));
+        cuentaRepository.save(cuenta);
+
+        double saldoActual = tarjeta.getSaldoTarjeta() != null ? tarjeta.getSaldoTarjeta() : 0.0;
+        tarjeta.setSaldoTarjeta(saldoActual + monto);
+        tarjetaRepository.save(tarjeta);
+
+        log.info("Recarga de {} a tarjeta débito {}. Nuevo saldo tarjeta: {}",
+                monto, tarjetaId, tarjeta.getSaldoTarjeta());
+        return tarjeta;
+    }
+
+    private void validarTarjetaParaRecarga(Tarjeta tarjeta, String numDocumento, Double monto) {
         if (!tarjeta.getNumDocumento().equals(numDocumento)) {
             throw new IllegalArgumentException("La tarjeta no pertenece al usuario");
         }
@@ -137,27 +157,16 @@ public class TarjetaService {
         if (monto == null || monto <= 0) {
             throw new IllegalArgumentException("El monto debe ser mayor a 0");
         }
+    }
 
-        Cuenta cuenta = cuentaRepository.findById(numeroCuenta)
-                .orElseThrow(() -> new IllegalArgumentException("Cuenta bancaria no encontrada"));
-
+    private void validarCuentaParaRecarga(Cuenta cuenta, String numDocumento, BigDecimal monto) {
         if (!cuenta.getNumDocumento().equals(numDocumento)) {
             throw new IllegalArgumentException("La cuenta no pertenece al usuario");
         }
-        if (cuenta.getSaldo().compareTo(BigDecimal.valueOf(monto)) < 0) {
+        if (cuenta.getSaldo().compareTo(monto) < 0) {
             throw new IllegalArgumentException(
                     "Saldo insuficiente en la cuenta bancaria. Saldo: $" + cuenta.getSaldo());
         }
-
-        cuenta.setSaldo(cuenta.getSaldo().subtract(BigDecimal.valueOf(monto)));
-        cuentaRepository.save(cuenta);
-
-        tarjeta.setSaldoTarjeta((tarjeta.getSaldoTarjeta() != null ? tarjeta.getSaldoTarjeta() : 0.0) + monto);
-        tarjetaRepository.save(tarjeta);
-
-        log.info("Recarga de {} a tarjeta débito {}. Nuevo saldo tarjeta: {}",
-                monto, tarjetaId, tarjeta.getSaldoTarjeta());
-        return tarjeta;
     }
 
     public List<Tarjeta> obtenerTarjetasUsuario(String numDocumento) {
