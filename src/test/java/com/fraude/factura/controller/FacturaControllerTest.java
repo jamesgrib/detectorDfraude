@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -30,8 +31,7 @@ class FacturaControllerTest {
 
     private Factura buildFactura() {
         return Factura.builder()
-                .id(1)
-                .numDocumento("12345678")
+                .id(1).numDocumento("12345678")
                 .servicio(Servicio.builder().id(1).nombre("LUZ").build())
                 .monto(100_000.0)
                 .estadoFactura(EstadoFactura.builder().id(2).nombre("PAGADA").build())
@@ -41,8 +41,6 @@ class FacturaControllerTest {
                 .fechaPago(LocalDateTime.now())
                 .build();
     }
-
-    // ─── obtenerFacturas ──────────────────────────────────────────────────────
 
     @Test
     void obtenerFacturas_retornaLista() {
@@ -56,8 +54,6 @@ class FacturaControllerTest {
         assertThat(body).hasSize(1);
     }
 
-    // ─── generarFacturasPrueba ────────────────────────────────────────────────
-
     @Test
     void generarFacturasPrueba_retorna200() {
         when(facturaService.generarFacturasPrueba("12345678")).thenReturn(List.of(buildFactura()));
@@ -70,14 +66,11 @@ class FacturaControllerTest {
         assertThat(body.get("mensaje")).isEqualTo("Facturas generadas");
     }
 
-    // ─── pagarFactura ─────────────────────────────────────────────────────────
-
     @Test
     void pagarFactura_conTarjeta_exitoso() {
         when(facturaService.pagarFactura(1, "12345678", 1, null)).thenReturn(buildFactura());
 
-        Map<String, Object> body = Map.of("tarjetaId", 1);
-        ResponseEntity<?> response = controller.pagarFactura("12345678", 1, body);
+        ResponseEntity<?> response = controller.pagarFactura("12345678", 1, Map.of("tarjetaId", 1));
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         @SuppressWarnings("unchecked")
@@ -90,8 +83,7 @@ class FacturaControllerTest {
     void pagarFactura_conCuenta_exitoso() {
         when(facturaService.pagarFactura(1, "12345678", null, "ACC-001")).thenReturn(buildFactura());
 
-        Map<String, Object> body = Map.of("numeroCuenta", "ACC-001");
-        ResponseEntity<?> response = controller.pagarFactura("12345678", 1, body);
+        ResponseEntity<?> response = controller.pagarFactura("12345678", 1, Map.of("numeroCuenta", "ACC-001"));
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         @SuppressWarnings("unchecked")
@@ -100,15 +92,12 @@ class FacturaControllerTest {
     }
 
     @Test
-    void pagarFactura_error_retorna400() {
+    void pagarFactura_error_propagaExcepcion() {
         when(facturaService.pagarFactura(any(), anyString(), any(), any()))
-                .thenThrow(new RuntimeException("Saldo insuficiente"));
+                .thenThrow(new IllegalArgumentException("Saldo insuficiente"));
 
-        ResponseEntity<?> response = controller.pagarFactura("12345678", 1, Map.of("numeroCuenta", "ACC-001"));
-
-        assertThat(response.getStatusCode().value()).isEqualTo(400);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resp = (Map<String, Object>) response.getBody();
-        assertThat(resp.get("error")).isEqualTo("Saldo insuficiente");
+        assertThatThrownBy(() -> controller.pagarFactura("12345678", 1, Map.of("numeroCuenta", "ACC-001")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Saldo insuficiente");
     }
 }
