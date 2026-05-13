@@ -104,6 +104,16 @@ class TransaccionControllerTest {
         assertThat(body).hasSize(1);
     }
 
+    @Test
+    void obtenerHistorial_errorInterno_retorna500() {
+        when(transaccionService.obtenerHistorial("ACC-001"))
+                .thenThrow(new RuntimeException("DB error"));
+
+        ResponseEntity<?> response = controller.obtenerHistorial("ACC-001");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(500);
+    }
+
     // ─── GET todas (admin) ────────────────────────────────────────────────────
 
     @Test
@@ -136,6 +146,17 @@ class TransaccionControllerTest {
         assertThat(body).hasSize(2);
     }
 
+    @Test
+    void obtenerTodas_errorInterno_retorna500() {
+        when(usuarioService.esAdministrador("99999999")).thenReturn(true);
+        when(transaccionService.obtenerTodasTransacciones())
+                .thenThrow(new RuntimeException("DB error"));
+
+        ResponseEntity<?> response = controller.obtenerTodasTransacciones("99999999");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(500);
+    }
+
     // ─── GET pendientes ───────────────────────────────────────────────────────
 
     @Test
@@ -147,6 +168,17 @@ class TransaccionControllerTest {
         ResponseEntity<?> response = controller.obtenerTransaccionesPendientes("99999999");
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    void obtenerPendientes_errorInterno_retorna500() {
+        when(usuarioService.esAdministrador("99999999")).thenReturn(true);
+        when(transaccionService.obtenerTransaccionesPendientes())
+                .thenThrow(new RuntimeException("DB error"));
+
+        ResponseEntity<?> response = controller.obtenerTransaccionesPendientes("99999999");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(500);
     }
 
     // ─── PUT actualizar estado ────────────────────────────────────────────────
@@ -189,6 +221,18 @@ class TransaccionControllerTest {
                 1, "99999999", Map.of("estadoNombre", "APROBADA"));
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    void actualizarEstado_errorInterno_retorna500() {
+        when(usuarioService.esAdministrador("99999999")).thenReturn(true);
+        when(transaccionService.actualizarEstadoTransaccion(1, "APROBADA"))
+                .thenThrow(new RuntimeException("DB error"));
+
+        ResponseEntity<?> response = controller.actualizarEstadoTransaccion(
+                1, "99999999", Map.of("estadoNombre", "APROBADA"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(500);
     }
 
     @Test

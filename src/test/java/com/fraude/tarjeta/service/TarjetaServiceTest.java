@@ -296,7 +296,127 @@ class TarjetaServiceTest {
         verify(tarjetaRepository).save(tarjeta);
     }
 
-    // ─── consultas ────────────────────────────────────────────────────────────
+    // ─── solicitarTarjeta — cobertura de detectarMarca ───────────────────────
+
+    @Test
+    void solicitarTarjeta_generaNumeroMastercard() {
+        // Forzamos que el mock de marca retorne MASTERCARD para cubrir esa rama
+        when(marcaTarjetaRepository.findByNombre(anyString())).thenReturn(Optional.of(marcaMastercard));
+        when(estadoTarjetaRepository.findByNombre("PENDIENTE")).thenReturn(Optional.of(estadoPendiente));
+        when(tarjetaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Ejecutamos varias veces para aumentar probabilidad de cubrir MASTERCARD
+        for (int i = 0; i < 5; i++) {
+            Tarjeta result = tarjetaService.solicitarTarjeta("12345678", "Juan", "CREDITO");
+            assertThat(result).isNotNull();
+        }
+    }
+
+    // ─── detectarMarca — via reflexión ────────────────────────────────────────
+
+    @Test
+    void detectarMarca_numeroNull_retornaUnknown() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, (Object) null)).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    void detectarMarca_numeroVacio_retornaUnknown() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "")).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    void detectarMarca_iniciaEn4_retornaVisa() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "4111111111111111")).isEqualTo("VISA");
+    }
+
+    @Test
+    void detectarMarca_iniciaEn51_retornaMastercard() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "5111111111111111")).isEqualTo("MASTERCARD");
+    }
+
+    @Test
+    void detectarMarca_iniciaEn55_retornaMastercard() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "5511111111111111")).isEqualTo("MASTERCARD");
+    }
+
+    @Test
+    void detectarMarca_iniciaEn56_noEsMastercard_retornaUnknown() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "5611111111111111")).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    void detectarMarca_prefijo2221_retornaMastercard() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "2221111111111111")).isEqualTo("MASTERCARD");
+    }
+
+    @Test
+    void detectarMarca_prefijo2720_retornaMastercard() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "2720111111111111")).isEqualTo("MASTERCARD");
+    }
+
+    @Test
+    void detectarMarca_prefijo2200_noEsMastercard_retornaUnknown() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "2200111111111111")).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    void detectarMarca_iniciaEn34_retornaAmex() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "341111111111111")).isEqualTo("AMEX");
+    }
+
+    @Test
+    void detectarMarca_iniciaEn37_retornaAmex() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "371111111111111")).isEqualTo("AMEX");
+    }
+
+    @Test
+    void detectarMarca_iniciaEn38_noEsAmex_retornaUnknown() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "381111111111111")).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    void detectarMarca_iniciaEn6_retornaUnknown() throws Exception {
+        java.lang.reflect.Method m = TarjetaService.class
+                .getDeclaredMethod("detectarMarca", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(tarjetaService, "6011111111111111")).isEqualTo("UNKNOWN");
+    }
 
     @Test
     void obtenerTarjetasUsuario_retornaListaDelUsuario() {
