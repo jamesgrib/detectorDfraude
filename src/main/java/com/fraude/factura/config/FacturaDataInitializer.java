@@ -25,23 +25,26 @@ import java.util.Map;
 @Slf4j
 public class FacturaDataInitializer implements ApplicationRunner {
 
+    private static final String KEY_NOMBRE = "nombre";
+    private static final String KEY_DESCRIPCION = "descripcion";
+
     private final ServicioRepository servicioRepository;
     private final EstadoFacturaRepository estadoFacturaRepository;
     private final EntityManager entityManager;
 
     private static final List<Map<String, String>> SERVICIOS = List.of(
-            Map.of("nombre", "LUZ", "descripcion", "Servicio de energía eléctrica"),
-            Map.of("nombre", "AGUA", "descripcion", "Servicio de acueducto y alcantarillado"),
-            Map.of("nombre", "GAS", "descripcion", "Gas natural domiciliario"),
-            Map.of("nombre", "INTERNET", "descripcion", "Servicio de internet"),
-            Map.of("nombre", "TELEFONO", "descripcion", "Servicio de telefonía móvil"),
-            Map.of("nombre", "TELEVISION", "descripcion", "Servicio de televisión por cable/streaming"),
-            Map.of("nombre", "SEGUROS", "descripcion", "Pago de seguros"));
+            Map.of(KEY_NOMBRE, "LUZ",        KEY_DESCRIPCION, "Servicio de energía eléctrica"),
+            Map.of(KEY_NOMBRE, "AGUA",       KEY_DESCRIPCION, "Servicio de acueducto y alcantarillado"),
+            Map.of(KEY_NOMBRE, "GAS",        KEY_DESCRIPCION, "Gas natural domiciliario"),
+            Map.of(KEY_NOMBRE, "INTERNET",   KEY_DESCRIPCION, "Servicio de internet"),
+            Map.of(KEY_NOMBRE, "TELEFONO",   KEY_DESCRIPCION, "Servicio de telefonía móvil"),
+            Map.of(KEY_NOMBRE, "TELEVISION", KEY_DESCRIPCION, "Servicio de televisión por cable/streaming"),
+            Map.of(KEY_NOMBRE, "SEGUROS",    KEY_DESCRIPCION, "Pago de seguros"));
 
     private static final List<Map<String, String>> ESTADOS = List.of(
-            Map.of("nombre", "PENDIENTE", "descripcion", "Factura pendiente de pago"),
-            Map.of("nombre", "PAGADA", "descripcion", "Factura pagada"),
-            Map.of("nombre", "VENCIDA", "descripcion", "Factura vencida sin pagar"));
+            Map.of(KEY_NOMBRE, "PENDIENTE", KEY_DESCRIPCION, "Factura pendiente de pago"),
+            Map.of(KEY_NOMBRE, "PAGADA",    KEY_DESCRIPCION, "Factura pagada"),
+            Map.of(KEY_NOMBRE, "VENCIDA",   KEY_DESCRIPCION, "Factura vencida sin pagar"));
 
     @Override
     @Transactional
@@ -53,24 +56,26 @@ public class FacturaDataInitializer implements ApplicationRunner {
 
     private void seedServicios() {
         for (Map<String, String> s : SERVICIOS) {
-            if (servicioRepository.findByNombre(s.get("nombre")).isEmpty()) {
+            String nombre = s.get(KEY_NOMBRE);
+            if (servicioRepository.findByNombre(nombre).isEmpty()) {
                 servicioRepository.save(Servicio.builder()
-                        .nombre(s.get("nombre"))
-                        .descripcion(s.get("descripcion"))
+                        .nombre(nombre)
+                        .descripcion(s.get(KEY_DESCRIPCION))
                         .build());
-                log.info("Servicio creado: {}", s.get("nombre"));
+                log.info("Servicio creado: {}", nombre);
             }
         }
     }
 
     private void seedEstados() {
         for (Map<String, String> e : ESTADOS) {
-            if (estadoFacturaRepository.findByNombre(e.get("nombre")).isEmpty()) {
+            String nombre = e.get(KEY_NOMBRE);
+            if (estadoFacturaRepository.findByNombre(nombre).isEmpty()) {
                 estadoFacturaRepository.save(EstadoFactura.builder()
-                        .nombre(e.get("nombre"))
-                        .descripcion(e.get("descripcion"))
+                        .nombre(nombre)
+                        .descripcion(e.get(KEY_DESCRIPCION))
                         .build());
-                log.info("EstadoFactura creado: {}", e.get("nombre"));
+                log.info("EstadoFactura creado: {}", nombre);
             }
         }
     }

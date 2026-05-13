@@ -16,33 +16,31 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Inicializa los datos de referencia para marcas de tarjeta y estados de
- * tarjeta,
- * y migra filas existentes que aún usan columnas legacy.
- */
 @Component
 @Order(1)
 @RequiredArgsConstructor
 @Slf4j
 public class TarjetaDataInitializer implements ApplicationRunner {
 
+    private static final String KEY_NOMBRE      = "nombre";
+    private static final String KEY_DESCRIPCION = "descripcion";
+
     private final MarcaTarjetaRepository marcaTarjetaRepository;
     private final EstadoTarjetaRepository estadoTarjetaRepository;
     private final EntityManager entityManager;
 
     private static final List<Map<String, String>> MARCAS = List.of(
-            Map.of("nombre", "VISA", "descripcion", "Tarjeta Visa"),
-            Map.of("nombre", "MASTERCARD", "descripcion", "Tarjeta Mastercard"),
-            Map.of("nombre", "AMEX", "descripcion", "American Express"),
-            Map.of("nombre", "UNKNOWN", "descripcion", "Marca no identificada"));
+            Map.of(KEY_NOMBRE, "VISA",        KEY_DESCRIPCION, "Tarjeta Visa"),
+            Map.of(KEY_NOMBRE, "MASTERCARD",  KEY_DESCRIPCION, "Tarjeta Mastercard"),
+            Map.of(KEY_NOMBRE, "AMEX",        KEY_DESCRIPCION, "American Express"),
+            Map.of(KEY_NOMBRE, "UNKNOWN",     KEY_DESCRIPCION, "Marca no identificada"));
 
     private static final List<Map<String, String>> ESTADOS_TARJETA = List.of(
-            Map.of("nombre", "ACTIVA", "descripcion", "Tarjeta activa y operativa"),
-            Map.of("nombre", "PENDIENTE", "descripcion", "Esperando aprobación del administrador"),
-            Map.of("nombre", "ELIMINADA", "descripcion", "Tarjeta eliminada por el usuario"),
-            Map.of("nombre", "RECHAZADA", "descripcion", "Solicitud rechazada por el administrador"),
-            Map.of("nombre", "BLOQUEADA", "descripcion", "Tarjeta bloqueada temporalmente"));
+            Map.of(KEY_NOMBRE, "ACTIVA",    KEY_DESCRIPCION, "Tarjeta activa y operativa"),
+            Map.of(KEY_NOMBRE, "PENDIENTE", KEY_DESCRIPCION, "Esperando aprobación del administrador"),
+            Map.of(KEY_NOMBRE, "ELIMINADA", KEY_DESCRIPCION, "Tarjeta eliminada por el usuario"),
+            Map.of(KEY_NOMBRE, "RECHAZADA", KEY_DESCRIPCION, "Solicitud rechazada por el administrador"),
+            Map.of(KEY_NOMBRE, "BLOQUEADA", KEY_DESCRIPCION, "Tarjeta bloqueada temporalmente"));
 
     @Override
     @Transactional
@@ -55,32 +53,30 @@ public class TarjetaDataInitializer implements ApplicationRunner {
 
     private void seedMarcas() {
         for (Map<String, String> m : MARCAS) {
-            if (marcaTarjetaRepository.findByNombre(m.get("nombre")).isEmpty()) {
+            String nombre = m.get(KEY_NOMBRE);
+            if (marcaTarjetaRepository.findByNombre(nombre).isEmpty()) {
                 marcaTarjetaRepository.save(MarcaTarjeta.builder()
-                        .nombre(m.get("nombre"))
-                        .descripcion(m.get("descripcion"))
+                        .nombre(nombre)
+                        .descripcion(m.get(KEY_DESCRIPCION))
                         .build());
-                log.info("MarcaTarjeta creada: {}", m.get("nombre"));
+                log.info("MarcaTarjeta creada: {}", nombre);
             }
         }
     }
 
     private void seedEstadosTarjeta() {
         for (Map<String, String> e : ESTADOS_TARJETA) {
-            if (estadoTarjetaRepository.findByNombre(e.get("nombre")).isEmpty()) {
+            String nombre = e.get(KEY_NOMBRE);
+            if (estadoTarjetaRepository.findByNombre(nombre).isEmpty()) {
                 estadoTarjetaRepository.save(EstadoTarjeta.builder()
-                        .nombre(e.get("nombre"))
-                        .descripcion(e.get("descripcion"))
+                        .nombre(nombre)
+                        .descripcion(e.get(KEY_DESCRIPCION))
                         .build());
-                log.info("EstadoTarjeta creado: {}", e.get("nombre"));
+                log.info("EstadoTarjeta creado: {}", nombre);
             }
         }
     }
 
-    /**
-     * Migra filas de tbl_tarjeta que aún tienen la columna legacy marca
-     * y no tienen marca_id asignado.
-     */
     private void migrarTarjetasLegacy() {
         if (!columnExists("tbl_tarjeta", "marca")) {
             return;
@@ -99,12 +95,6 @@ public class TarjetaDataInitializer implements ApplicationRunner {
         }
     }
 
-    /**
-     * Migra el campo estado_id legacy (1=ACTIVA, 2=PENDIENTE, 3=ELIMINADA,
-     * 4=RECHAZADA)
-     * para que apunte a la FK en tbl_estado_tarjeta.
-     * Solo se ejecuta cuando hay filas cuyo estado_id no es un FK válido.
-     */
     private void migrarEstadosTarjeta() {
         int migrated = entityManager.createNativeQuery("""
                 UPDATE tbl_tarjeta

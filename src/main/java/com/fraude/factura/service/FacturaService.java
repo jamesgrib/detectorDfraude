@@ -17,12 +17,16 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class FacturaService {
+
+    // Instancia reutilizable de Random (evita crear una nueva en cada llamada)
+    private final Random rnd = new Random();
 
     private final FacturaRepository facturaRepository;
     private final TarjetaRepository tarjetaRepository;
@@ -52,13 +56,12 @@ public class FacturaService {
         // Rangos de montos por servicio [min, max]
         double[][] rangos = {
                 { 60000, 180000 }, // LUZ
-                { 30000, 90000 }, // AGUA
+                { 30000, 90000  }, // AGUA
                 { 50000, 120000 }, // INTERNET
-                { 25000, 75000 }, // GAS
-                { 40000, 100000 } // TELEFONO
+                { 25000, 75000  }, // GAS
+                { 40000, 100000 }  // TELEFONO
         };
 
-        java.util.Random rnd = new java.util.Random();
         EstadoFactura estadoPendiente = getEstado("PENDIENTE");
 
         for (int i = 0; i < servicios.length; i++) {
@@ -74,8 +77,9 @@ public class FacturaService {
 
             if (!yaExiste) {
                 // Monto aleatorio dentro del rango, redondeado a centenas
-                double montoAleatorio = Math.round((rango[0] + rnd.nextDouble() * (rango[1] - rango[0])) / 100.0)
-                        * 100.0;
+                // Cast explícito a long para evitar overflow en la multiplicación
+                double montoAleatorio = (long) Math.round(
+                        (rango[0] + rnd.nextDouble() * (rango[1] - rango[0])) / 100.0) * 100.0;
                 Factura factura = Factura.builder()
                         .numDocumento(numDocumento)
                         .servicio(getServicio(servicioNombre))
@@ -83,7 +87,7 @@ public class FacturaService {
                         .referencia("REF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                         .monto(montoAleatorio)
                         .estadoFactura(estadoPendiente)
-                        .fechaVencimiento(LocalDateTime.now().plusDays(15 + diasExtra * 3))
+                        .fechaVencimiento(LocalDateTime.now().plusDays(15L + diasExtra * 3L))
                         .fechaCreacion(LocalDateTime.now())
                         .build();
                 facturaRepository.save(factura);
@@ -102,63 +106,13 @@ public class FacturaService {
         Factura factura = facturaRepository.findById(facturaId)
                 .orElseThrow(() -> new RuntimeException("Factura no encontrada"));
 
-        if (!factura.getNumDocumento().equals(numDocumento)) {
-            throw new RuntimeException("No tienes permiso para pagar esta factura");
-        }
-        if ("PAGADA".equals(factura.getEstado())) {
-            throw new RuntimeException("Esta factura ya fue pagada");
-        }
+        validarPropietarioFactura(factura, numDocumento);
+        validarFacturaNoPagada(factura);
 
         if (tarjetaId != null) {
-            Tarjeta tarjeta = tarjetaRepository.findById(tarjetaId)
-                    .orElseThrow(() -> new RuntimeException("Tarjeta no encontrada"));
-
-            if (!tarjeta.getNumDocumento().equals(numDocumento)) {
-                throw new RuntimeException("La tarjeta no pertenece al usuario");
-            }
-            if (tarjeta.getEstadoId() != 1) {
-                throw new RuntimeException("La tarjeta no esta activa");
-            }
-
-            double monto = factura.getMonto();
-
-            if ("CREDITO".equals(tarjeta.getTipoTarjeta())) {
-                double disponible = tarjeta.getCreditoDisponible() != null ? tarjeta.getCreditoDisponible() : 0.0;
-                if (disponible < monto) {
-                    throw new RuntimeException(
-                            "Credito disponible insuficiente. Disponible: $" + disponible + " | Factura: $" + monto);
-                }
-                tarjeta.setCreditoDisponible(disponible - monto);
-                log.info("Pago con tarjeta credito. Credito restante: {}", tarjeta.getCreditoDisponible());
-            } else {
-                double saldo = tarjeta.getSaldoTarjeta() != null ? tarjeta.getSaldoTarjeta() : 0.0;
-                if (saldo < monto) {
-                    throw new RuntimeException(
-                            "Saldo de tarjeta debito insuficiente. Saldo: $" + saldo + " | Factura: $" + monto);
-                }
-                tarjeta.setSaldoTarjeta(saldo - monto);
-                log.info("Pago con tarjeta debito. Saldo restante: {}", tarjeta.getSaldoTarjeta());
-            }
-
-            tarjetaRepository.save(tarjeta);
-            factura.setTarjetaId(tarjetaId);
-
+            pagarConTarjeta(factura, numDocumento, tarjetaId);
         } else if (numeroCuenta != null) {
-            Cuenta cuenta = cuentaRepository.findById(numeroCuenta)
-                    .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
-
-            if (!cuenta.getNumDocumento().equals(numDocumento)) {
-                throw new RuntimeException("La cuenta no pertenece al usuario");
-            }
-            if (cuenta.getSaldo().compareTo(BigDecimal.valueOf(factura.getMonto())) < 0) {
-                throw new RuntimeException(
-                        "Saldo insuficiente. Saldo: $" + cuenta.getSaldo() + " | Factura: $" + factura.getMonto());
-            }
-
-            cuenta.setSaldo(cuenta.getSaldo().subtract(BigDecimal.valueOf(factura.getMonto())));
-            cuentaRepository.save(cuenta);
-            log.info("Factura pagada con saldo de cuenta. Nuevo saldo: {}", cuenta.getSaldo());
-
+            pagarConCuenta(factura, numDocumento, numeroCuenta);
         } else {
             throw new RuntimeException("Debes indicar una tarjeta o una cuenta para pagar");
         }
@@ -169,5 +123,79 @@ public class FacturaService {
 
         log.info("Factura {} pagada exitosamente", facturaId);
         return factura;
+    }
+
+    // ── helpers privados ──────────────────────────────────────────────────────
+
+    private void validarPropietarioFactura(Factura factura, String numDocumento) {
+        if (!factura.getNumDocumento().equals(numDocumento)) {
+            throw new RuntimeException("No tienes permiso para pagar esta factura");
+        }
+    }
+
+    private void validarFacturaNoPagada(Factura factura) {
+        if ("PAGADA".equals(factura.getEstado())) {
+            throw new RuntimeException("Esta factura ya fue pagada");
+        }
+    }
+
+    private void pagarConTarjeta(Factura factura, String numDocumento, Integer tarjetaId) {
+        Tarjeta tarjeta = tarjetaRepository.findById(tarjetaId)
+                .orElseThrow(() -> new RuntimeException("Tarjeta no encontrada"));
+
+        if (!tarjeta.getNumDocumento().equals(numDocumento)) {
+            throw new RuntimeException("La tarjeta no pertenece al usuario");
+        }
+        if (tarjeta.getEstadoId() != 1) {
+            throw new RuntimeException("La tarjeta no esta activa");
+        }
+
+        double monto = factura.getMonto();
+
+        if ("CREDITO".equals(tarjeta.getTipoTarjeta())) {
+            pagarConTarjetaCredito(tarjeta, monto);
+        } else {
+            pagarConTarjetaDebito(tarjeta, monto);
+        }
+
+        tarjetaRepository.save(tarjeta);
+        factura.setTarjetaId(tarjetaId);
+    }
+
+    private void pagarConTarjetaCredito(Tarjeta tarjeta, double monto) {
+        double disponible = tarjeta.getCreditoDisponible() != null ? tarjeta.getCreditoDisponible() : 0.0;
+        if (disponible < monto) {
+            throw new RuntimeException(
+                    "Credito disponible insuficiente. Disponible: $" + disponible + " | Factura: $" + monto);
+        }
+        tarjeta.setCreditoDisponible(disponible - monto);
+        log.info("Pago con tarjeta credito. Credito restante: {}", tarjeta.getCreditoDisponible());
+    }
+
+    private void pagarConTarjetaDebito(Tarjeta tarjeta, double monto) {
+        double saldo = tarjeta.getSaldoTarjeta() != null ? tarjeta.getSaldoTarjeta() : 0.0;
+        if (saldo < monto) {
+            throw new RuntimeException(
+                    "Saldo de tarjeta debito insuficiente. Saldo: $" + saldo + " | Factura: $" + monto);
+        }
+        tarjeta.setSaldoTarjeta(saldo - monto);
+        log.info("Pago con tarjeta debito. Saldo restante: {}", tarjeta.getSaldoTarjeta());
+    }
+
+    private void pagarConCuenta(Factura factura, String numDocumento, String numeroCuenta) {
+        Cuenta cuenta = cuentaRepository.findById(numeroCuenta)
+                .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
+
+        if (!cuenta.getNumDocumento().equals(numDocumento)) {
+            throw new RuntimeException("La cuenta no pertenece al usuario");
+        }
+        if (cuenta.getSaldo().compareTo(BigDecimal.valueOf(factura.getMonto())) < 0) {
+            throw new RuntimeException(
+                    "Saldo insuficiente. Saldo: $" + cuenta.getSaldo() + " | Factura: $" + factura.getMonto());
+        }
+
+        cuenta.setSaldo(cuenta.getSaldo().subtract(BigDecimal.valueOf(factura.getMonto())));
+        cuentaRepository.save(cuenta);
+        log.info("Factura pagada con saldo de cuenta. Nuevo saldo: {}", cuenta.getSaldo());
     }
 }
