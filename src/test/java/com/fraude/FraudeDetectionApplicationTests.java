@@ -8,6 +8,7 @@ class FraudeDetectionApplicationTests {
 
 	@Test
 	void contextLoads() {
+		// Verifica que el contexto de Spring Boot carga correctamente
 	}
 
 }

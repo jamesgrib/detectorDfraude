@@ -22,6 +22,10 @@ import java.util.List;
 @Service
 public class TransaccionService {
 
+    private static final String ESTADO_APROBADA  = "APROBADA";
+    private static final String ESTADO_RECHAZADA = "RECHAZADA";
+    private static final String ESTADO_PENDIENTE = "PENDIENTE";
+
     private final TransaccionRepository transaccionRepository;
     private final FraudeService fraudeService;
     private final CuentaRepository cuentaRepository;
@@ -42,18 +46,20 @@ public class TransaccionService {
         String key = (nombre != null && !nombre.isBlank()) ? nombre.toUpperCase() : "TRANSFERENCIA";
         return tipoTransaccionRepository.findByNombre(key)
                 .orElseGet(() -> tipoTransaccionRepository.findByNombre("TRANSFERENCIA")
-                        .orElseThrow(() -> new RuntimeException("Tipo de transacción no encontrado: " + key)));
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Tipo de transaccion no encontrado: " + key)));
     }
 
     private EstadoTransaccion getEstado(String nombre) {
         return estadoTransaccionRepository.findByNombre(nombre)
-                .orElseThrow(() -> new RuntimeException("Estado de transacción no encontrado: " + nombre));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Estado de transaccion no encontrado: " + nombre));
     }
 
     @Transactional
     public Transaccion procesarTransaccion(Transaccion transaccion) {
         try {
-            log.info("Procesando transacción: origen={}, destino={}, monto={}",
+            log.info("Procesando transaccion: origen={}, destino={}, monto={}",
                     transaccion.getCuentaOrigenId(),
                     transaccion.getCuentaDestinoId(),
                     transaccion.getMonto());
@@ -68,23 +74,21 @@ public class TransaccionService {
                 throw new IllegalArgumentException("Cuenta destino es requerida");
             }
 
-            Cuenta origen = cuentaRepository.findById(transaccion.getCuentaOrigenId())
+            Cuenta origen  = cuentaRepository.findById(transaccion.getCuentaOrigenId())
                     .orElseThrow(() -> new IllegalArgumentException("Cuenta origen no existe"));
             Cuenta destino = cuentaRepository.findById(transaccion.getCuentaDestinoId())
                     .orElseThrow(() -> new IllegalArgumentException("Cuenta destino no existe"));
 
-            // Evaluar fraude (devuelve nombre: APROBADA, PENDIENTE, RECHAZADA)
             String estadoNombre = fraudeService.evaluarFraude(transaccion);
             log.info("Estado de fraude evaluado: {}", estadoNombre);
             transaccion.setEstadoTransaccion(getEstado(estadoNombre));
 
-            // Si es aprobada, actualizar saldos
-            if ("APROBADA".equals(estadoNombre)) {
+            if (ESTADO_APROBADA.equals(estadoNombre)) {
                 BigDecimal montoTransferencia = BigDecimal.valueOf(transaccion.getMonto());
                 if (origen.getSaldo().compareTo(montoTransferencia) < 0) {
                     log.error("Saldo insuficiente: disponible={}, requerido={}",
                             origen.getSaldo(), montoTransferencia);
-                    transaccion.setEstadoTransaccion(getEstado("RECHAZADA"));
+                    transaccion.setEstadoTransaccion(getEstado(ESTADO_RECHAZADA));
                 } else {
                     origen.setSaldo(origen.getSaldo().subtract(montoTransferencia));
                     destino.setSaldo(destino.getSaldo().add(montoTransferencia));
@@ -94,10 +98,9 @@ public class TransaccionService {
                             origen.getSaldo(), destino.getSaldo());
                 }
             } else {
-                log.info("ℹTransacción no aprobada (estado={}). Saldos no se actualizan.", estadoNombre);
+                log.info("Transaccion no aprobada (estado={}). Saldos no se actualizan.", estadoNombre);
             }
 
-            // Asignar tipo y fecha
             if (transaccion.getTipoTransaccion() == null) {
                 transaccion.setTipoTransaccion(getTipo(null));
             } else {
@@ -106,21 +109,22 @@ public class TransaccionService {
             transaccion.setFechaCreacion(LocalDateTime.now());
 
             Transaccion resultado = transaccionRepository.save(transaccion);
-            log.info("Transacción guardada con ID: {}, Estado: {}", resultado.getId(), resultado.getEstadoNombre());
+            log.info("Transaccion guardada con ID: {}, Estado: {}",
+                    resultado.getId(), resultado.getEstadoNombre());
             return resultado;
 
         } catch (IllegalArgumentException e) {
-            log.error("Error de validación: {}", e.getMessage());
+            log.error("Error de validacion: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            log.error("Error inesperado al procesar transacción: {}", e.getMessage(), e);
-            throw new RuntimeException("Error al procesar transacción: " + e.getMessage());
+            log.error("Error inesperado al procesar transaccion: {}", e.getMessage(), e);
+            throw new IllegalStateException("Error al procesar transaccion: " + e.getMessage());
         }
     }
 
     public List<Transaccion> obtenerHistorial(String cuentaId) {
         try {
-            List<Transaccion> enviadas = transaccionRepository.findByCuentaOrigenId(cuentaId);
+            List<Transaccion> enviadas  = transaccionRepository.findByCuentaOrigenId(cuentaId);
             List<Transaccion> recibidas = transaccionRepository.findByCuentaDestinoId(cuentaId);
             List<Transaccion> historial = new ArrayList<>();
             historial.addAll(enviadas);
@@ -148,7 +152,8 @@ public class TransaccionService {
 
     public List<Transaccion> obtenerTransaccionesPendientes() {
         try {
-            List<Transaccion> pendientes = transaccionRepository.findByEstadoTransaccionNombre("PENDIENTE");
+            List<Transaccion> pendientes =
+                    transaccionRepository.findByEstadoTransaccionNombre(ESTADO_PENDIENTE);
             pendientes.sort(Comparator.comparing(Transaccion::getFechaCreacion,
                     Comparator.nullsLast(Comparator.reverseOrder())));
             return pendientes;
@@ -162,21 +167,19 @@ public class TransaccionService {
     public Transaccion actualizarEstadoTransaccion(Integer id, String nuevoEstadoNombre) {
         try {
             Transaccion transaccion = transaccionRepository.findById(id)
-                    .orElseThrow(() -> new IllegalArgumentException("Transacción no encontrada"));
+                    .orElseThrow(() -> new IllegalArgumentException("Transaccion no encontrada"));
 
-            String estadoActual = transaccion.getEstadoNombre();
-
-            if (!"PENDIENTE".equals(estadoActual)) {
-                throw new IllegalArgumentException("Solo se pueden validar transacciones en estado PENDIENTE");
+            if (!ESTADO_PENDIENTE.equals(transaccion.getEstadoNombre())) {
+                throw new IllegalArgumentException(
+                        "Solo se pueden validar transacciones en estado PENDIENTE");
+            }
+            if (!ESTADO_APROBADA.equals(nuevoEstadoNombre)
+                    && !ESTADO_RECHAZADA.equals(nuevoEstadoNombre)) {
+                throw new IllegalArgumentException("Estado invalido. Debe ser APROBADA o RECHAZADA");
             }
 
-            if (!"APROBADA".equals(nuevoEstadoNombre) && !"RECHAZADA".equals(nuevoEstadoNombre)) {
-                throw new IllegalArgumentException("Estado inválido. Debe ser APROBADA o RECHAZADA");
-            }
-
-            // Si cambia de PENDIENTE a APROBADA, actualizar saldos
-            if ("APROBADA".equals(nuevoEstadoNombre)) {
-                Cuenta origen = cuentaRepository.findById(transaccion.getCuentaOrigenId())
+            if (ESTADO_APROBADA.equals(nuevoEstadoNombre)) {
+                Cuenta origen  = cuentaRepository.findById(transaccion.getCuentaOrigenId())
                         .orElseThrow(() -> new IllegalArgumentException("Cuenta origen no existe"));
                 Cuenta destino = cuentaRepository.findById(transaccion.getCuentaDestinoId())
                         .orElseThrow(() -> new IllegalArgumentException("Cuenta destino no existe"));
@@ -194,15 +197,15 @@ public class TransaccionService {
 
             transaccion.setEstadoTransaccion(getEstado(nuevoEstadoNombre));
             Transaccion actualizada = transaccionRepository.save(transaccion);
-            log.info("Transacción actualizada: id={}, estado={}", id, nuevoEstadoNombre);
+            log.info("Transaccion actualizada: id={}, estado={}", id, nuevoEstadoNombre);
             return actualizada;
 
         } catch (IllegalArgumentException e) {
-            log.error("Error de validación: {}", e.getMessage());
+            log.error("Error de validacion: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
             log.error("Error inesperado al actualizar estado: {}", e.getMessage(), e);
-            throw new RuntimeException("Error al actualizar estado: " + e.getMessage());
+            throw new IllegalStateException("Error al actualizar estado: " + e.getMessage());
         }
     }
 }

@@ -290,7 +290,7 @@ class TransaccionServiceTest {
 
         assertThatThrownBy(() -> transaccionService.actualizarEstadoTransaccion(1, "INVALIDO"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Estado inválido");
+                .hasMessageContaining("Estado invalido");
     }
 
     @Test
