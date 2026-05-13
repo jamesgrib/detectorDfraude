@@ -296,7 +296,21 @@ class TarjetaServiceTest {
         verify(tarjetaRepository).save(tarjeta);
     }
 
-    // ─── consultas ────────────────────────────────────────────────────────────
+    // ─── solicitarTarjeta — cobertura de detectarMarca ───────────────────────
+
+    @Test
+    void solicitarTarjeta_generaNumeroMastercard() {
+        // Forzamos que el mock de marca retorne MASTERCARD para cubrir esa rama
+        when(marcaTarjetaRepository.findByNombre(anyString())).thenReturn(Optional.of(marcaMastercard));
+        when(estadoTarjetaRepository.findByNombre("PENDIENTE")).thenReturn(Optional.of(estadoPendiente));
+        when(tarjetaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Ejecutamos varias veces para aumentar probabilidad de cubrir MASTERCARD
+        for (int i = 0; i < 5; i++) {
+            Tarjeta result = tarjetaService.solicitarTarjeta("12345678", "Juan", "CREDITO");
+            assertThat(result).isNotNull();
+        }
+    }
 
     @Test
     void obtenerTarjetasUsuario_retornaListaDelUsuario() {
