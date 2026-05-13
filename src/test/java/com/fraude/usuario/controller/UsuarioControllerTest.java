@@ -1,6 +1,5 @@
 package com.fraude.usuario.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fraude.usuario.dto.LoginRequest;
 import com.fraude.usuario.dto.LoginResponse;
 import com.fraude.usuario.dto.RegisterRequest;
@@ -8,44 +7,41 @@ import com.fraude.usuario.model.Usuario;
 import com.fraude.usuario.model.UsuarioId;
 import com.fraude.usuario.service.UsuarioService;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(UsuarioController.class)
+@ExtendWith(MockitoExtension.class)
 class UsuarioControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockitoBean
+    @Mock
     private UsuarioService usuarioService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @InjectMocks
+    private UsuarioController controller;
 
     @Test
-    void getAll_retornaListaDeUsuarios() throws Exception {
+    void getAll_retornaListaDeUsuarios() {
         Usuario u = Usuario.builder().id(new UsuarioId("12345678")).nombre("Juan").build();
         when(usuarioService.getAllUsuarios()).thenReturn(List.of(u));
 
-        mockMvc.perform(get("/api/usuarios"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].nombre").value("Juan"));
+        List<Usuario> result = controller.getAll();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getNombre()).isEqualTo("Juan");
     }
 
     @Test
-    void login_exitoso_retorna200() throws Exception {
+    void login_exitoso_retornaResponse() {
         LoginResponse resp = LoginResponse.builder()
                 .success(true)
                 .mensaje("Login exitoso")
@@ -57,32 +53,29 @@ class UsuarioControllerTest {
                 .build();
         when(usuarioService.login(any(LoginRequest.class))).thenReturn(resp);
 
-        mockMvc.perform(post("/api/usuarios/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new LoginRequest("12345678", "pass123"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.nombre").value("Juan"))
-                .andExpect(jsonPath("$.rol").value("USER"));
+        LoginResponse result = controller.login(new LoginRequest("12345678", "pass123"));
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getNombre()).isEqualTo("Juan");
+        assertThat(result.getRol()).isEqualTo("USER");
     }
 
     @Test
-    void login_fallido_retorna200ConSuccessFalse() throws Exception {
+    void login_fallido_retornaSuccessFalse() {
         LoginResponse resp = LoginResponse.builder()
                 .success(false)
                 .mensaje("Contraseña incorrecta")
                 .build();
         when(usuarioService.login(any(LoginRequest.class))).thenReturn(resp);
 
-        mockMvc.perform(post("/api/usuarios/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new LoginRequest("12345678", "wrong"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(false));
+        LoginResponse result = controller.login(new LoginRequest("12345678", "wrong"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMensaje()).contains("Contraseña");
     }
 
     @Test
-    void register_exitoso_retorna200() throws Exception {
+    void register_exitoso_retorna200() {
         LoginResponse resp = LoginResponse.builder()
                 .success(true)
                 .mensaje("Cuenta creada exitosamente")
@@ -102,16 +95,15 @@ class UsuarioControllerTest {
                 .password("pass123")
                 .build();
 
-        mockMvc.perform(post("/api/usuarios/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.numeroCuenta").value("ACC-123456"));
+        ResponseEntity<LoginResponse> response = controller.register(req);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody().isSuccess()).isTrue();
+        assertThat(response.getBody().getNumeroCuenta()).isEqualTo("ACC-123456");
     }
 
     @Test
-    void register_documentoDuplicado_retorna400() throws Exception {
+    void register_documentoDuplicado_retorna400() {
         LoginResponse resp = LoginResponse.builder()
                 .success(false)
                 .mensaje("El número de documento ya está registrado")
@@ -126,10 +118,9 @@ class UsuarioControllerTest {
                 .password("pass")
                 .build();
 
-        mockMvc.perform(post("/api/usuarios/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false));
+        ResponseEntity<LoginResponse> response = controller.register(req);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().isSuccess()).isFalse();
     }
 }

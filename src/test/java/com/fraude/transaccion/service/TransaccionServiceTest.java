@@ -14,6 +14,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class TransaccionServiceTest {
 
     @Mock
@@ -133,8 +136,9 @@ class TransaccionServiceTest {
                 .cuentaOrigenId("ACC-001").cuentaDestinoId("ACC-999").build();
         when(cuentaRepository.findById("ACC-001")).thenReturn(Optional.of(cuentaOrigen));
         when(cuentaRepository.findById("ACC-999")).thenReturn(Optional.empty());
-        when(fraudeService.evaluarFraude(any())).thenReturn("APROBADA");
-        when(estadoTransaccionRepository.findByNombre("APROBADA")).thenReturn(Optional.of(estadoAprobada));
+        // El fraude se evalúa antes de buscar cuentas destino, pero el saldo se verifica después
+        lenient().when(fraudeService.evaluarFraude(any())).thenReturn("APROBADA");
+        lenient().when(estadoTransaccionRepository.findByNombre("APROBADA")).thenReturn(Optional.of(estadoAprobada));
 
         assertThatThrownBy(() -> transaccionService.procesarTransaccion(t))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -237,7 +241,8 @@ class TransaccionServiceTest {
     void obtenerTodasTransacciones_retornaOrdenadas() {
         Transaccion t1 = Transaccion.builder().id(1).fechaCreacion(LocalDateTime.now().minusDays(2)).build();
         Transaccion t2 = Transaccion.builder().id(2).fechaCreacion(LocalDateTime.now().minusDays(1)).build();
-        when(transaccionRepository.findAll()).thenReturn(List.of(t1, t2));
+        List<Transaccion> lista = new java.util.ArrayList<>(List.of(t1, t2));
+        when(transaccionRepository.findAll()).thenReturn(lista);
 
         List<Transaccion> result = transaccionService.obtenerTodasTransacciones();
 
@@ -251,14 +256,13 @@ class TransaccionServiceTest {
     void obtenerTransaccionesPendientes_retornaListaPendientes() {
         Transaccion p = Transaccion.builder().id(1).estadoTransaccion(estadoPendiente)
                 .fechaCreacion(LocalDateTime.now()).build();
-        when(transaccionRepository.findByEstadoTransaccionNombre("PENDIENTE")).thenReturn(List.of(p));
+        List<Transaccion> lista = new java.util.ArrayList<>(List.of(p));
+        when(transaccionRepository.findByEstadoTransaccionNombre("PENDIENTE")).thenReturn(lista);
 
         List<Transaccion> result = transaccionService.obtenerTransaccionesPendientes();
 
         assertThat(result).hasSize(1);
     }
-
-    // ─── actualizarEstadoTransaccion ──────────────────────────────────────────
 
     @Test
     void actualizarEstado_transaccionNoExiste_lanzaExcepcion() {

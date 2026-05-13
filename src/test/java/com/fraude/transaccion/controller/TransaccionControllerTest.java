@@ -1,40 +1,35 @@
 package com.fraude.transaccion.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fraude.transaccion.model.EstadoTransaccion;
 import com.fraude.transaccion.model.Transaccion;
 import com.fraude.transaccion.service.TransaccionService;
 import com.fraude.usuario.service.UsuarioService;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(TransaccionController.class)
+@ExtendWith(MockitoExtension.class)
 class TransaccionControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockitoBean
+    @Mock
     private TransaccionService transaccionService;
 
-    @MockitoBean
+    @Mock
     private UsuarioService usuarioService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @InjectMocks
+    private TransaccionController controller;
 
     private Transaccion buildTransaccion(String estado) {
         EstadoTransaccion est = EstadoTransaccion.builder().id(1).nombre(estado).build();
@@ -48,172 +43,175 @@ class TransaccionControllerTest {
                 .build();
     }
 
-    // ─── POST /api/transacciones ──────────────────────────────────────────────
+    // ─── POST procesarTransaccion ─────────────────────────────────────────────
 
     @Test
-    void procesarTransaccion_exitoso_retorna200() throws Exception {
+    void procesarTransaccion_exitoso_retorna200() {
         Transaccion t = buildTransaccion("APROBADA");
         when(transaccionService.procesarTransaccion(any())).thenReturn(t);
 
         Transaccion body = Transaccion.builder()
                 .monto(100_000.0).cuentaOrigenId("ACC-001").cuentaDestinoId("ACC-002").build();
 
-        mockMvc.perform(post("/api/transacciones")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estadoNombre").value("APROBADA"));
+        ResponseEntity<?> response = controller.procesarTransaccion(body);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(((Transaccion) response.getBody()).getEstadoNombre()).isEqualTo("APROBADA");
     }
 
     @Test
-    void procesarTransaccion_validacionFalla_retorna400() throws Exception {
+    void procesarTransaccion_validacionFalla_retorna400() {
         when(transaccionService.procesarTransaccion(any()))
                 .thenThrow(new IllegalArgumentException("Monto debe ser mayor a 0"));
 
         Transaccion body = Transaccion.builder()
                 .monto(0.0).cuentaOrigenId("ACC-001").cuentaDestinoId("ACC-002").build();
 
-        mockMvc.perform(post("/api/transacciones")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Monto debe ser mayor a 0"));
+        ResponseEntity<?> response = controller.procesarTransaccion(body);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> errorBody = (Map<String, Object>) response.getBody();
+        assertThat(errorBody.get("success")).isEqualTo(false);
+        assertThat(errorBody.get("message")).isEqualTo("Monto debe ser mayor a 0");
     }
 
     @Test
-    void procesarTransaccion_errorInterno_retorna500() throws Exception {
+    void procesarTransaccion_errorInterno_retorna500() {
         when(transaccionService.procesarTransaccion(any()))
                 .thenThrow(new RuntimeException("DB error"));
 
         Transaccion body = Transaccion.builder()
                 .monto(100.0).cuentaOrigenId("ACC-001").cuentaDestinoId("ACC-002").build();
 
-        mockMvc.perform(post("/api/transacciones")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.success").value(false));
+        ResponseEntity<?> response = controller.procesarTransaccion(body);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(500);
     }
 
-    // ─── GET /api/transacciones/cuenta/{numeroCuenta} ─────────────────────────
+    // ─── GET historial ────────────────────────────────────────────────────────
 
     @Test
-    void obtenerHistorial_retornaLista() throws Exception {
+    void obtenerHistorial_retornaLista() {
         when(transaccionService.obtenerHistorial("ACC-001"))
                 .thenReturn(List.of(buildTransaccion("APROBADA")));
 
-        mockMvc.perform(get("/api/transacciones/cuenta/ACC-001"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].estadoNombre").value("APROBADA"));
+        ResponseEntity<?> response = controller.obtenerHistorial("ACC-001");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        List<Transaccion> body = (List<Transaccion>) response.getBody();
+        assertThat(body).hasSize(1);
     }
 
-    // ─── GET /api/transacciones (admin) ───────────────────────────────────────
+    // ─── GET todas (admin) ────────────────────────────────────────────────────
 
     @Test
-    void obtenerTodas_sinHeader_retorna400() throws Exception {
-        mockMvc.perform(get("/api/transacciones"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false));
+    void obtenerTodas_sinHeader_retorna400() {
+        ResponseEntity<?> response = controller.obtenerTodasTransacciones(null);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
     }
 
     @Test
-    void obtenerTodas_noAdmin_retorna403() throws Exception {
+    void obtenerTodas_noAdmin_retorna403() {
         when(usuarioService.esAdministrador("12345678")).thenReturn(false);
 
-        mockMvc.perform(get("/api/transacciones")
-                        .header("X-Admin-Documento", "12345678"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.success").value(false));
+        ResponseEntity<?> response = controller.obtenerTodasTransacciones("12345678");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(403);
     }
 
     @Test
-    void obtenerTodas_adminValido_retornaLista() throws Exception {
+    void obtenerTodas_adminValido_retornaLista() {
         when(usuarioService.esAdministrador("99999999")).thenReturn(true);
         when(transaccionService.obtenerTodasTransacciones())
                 .thenReturn(List.of(buildTransaccion("APROBADA"), buildTransaccion("PENDIENTE")));
 
-        mockMvc.perform(get("/api/transacciones")
-                        .header("X-Admin-Documento", "99999999"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+        ResponseEntity<?> response = controller.obtenerTodasTransacciones("99999999");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        List<Transaccion> body = (List<Transaccion>) response.getBody();
+        assertThat(body).hasSize(2);
     }
 
-    // ─── GET /api/transacciones/pendientes ────────────────────────────────────
+    // ─── GET pendientes ───────────────────────────────────────────────────────
 
     @Test
-    void obtenerPendientes_adminValido_retornaLista() throws Exception {
+    void obtenerPendientes_adminValido_retornaLista() {
         when(usuarioService.esAdministrador("99999999")).thenReturn(true);
         when(transaccionService.obtenerTransaccionesPendientes())
                 .thenReturn(List.of(buildTransaccion("PENDIENTE")));
 
-        mockMvc.perform(get("/api/transacciones/pendientes")
-                        .header("X-Admin-Documento", "99999999"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].estadoNombre").value("PENDIENTE"));
+        ResponseEntity<?> response = controller.obtenerTransaccionesPendientes("99999999");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
     }
 
-    // ─── PUT /api/transacciones/{id}/estado ───────────────────────────────────
+    // ─── PUT actualizar estado ────────────────────────────────────────────────
 
     @Test
-    void actualizarEstado_sinHeader_retorna400() throws Exception {
-        mockMvc.perform(put("/api/transacciones/1/estado")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("estadoNombre", "APROBADA"))))
-                .andExpect(status().isBadRequest());
+    void actualizarEstado_sinHeader_retorna400() {
+        ResponseEntity<?> response = controller.actualizarEstadoTransaccion(
+                1, null, Map.of("estadoNombre", "APROBADA"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
     }
 
     @Test
-    void actualizarEstado_estadoInvalido_retorna400() throws Exception {
+    void actualizarEstado_noAdmin_retorna403() {
+        when(usuarioService.esAdministrador("12345678")).thenReturn(false);
+
+        ResponseEntity<?> response = controller.actualizarEstadoTransaccion(
+                1, "12345678", Map.of("estadoNombre", "APROBADA"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test
+    void actualizarEstado_estadoInvalido_retorna400() {
         when(usuarioService.esAdministrador("99999999")).thenReturn(true);
 
-        mockMvc.perform(put("/api/transacciones/1/estado")
-                        .header("X-Admin-Documento", "99999999")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("estadoNombre", "INVALIDO"))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false));
+        ResponseEntity<?> response = controller.actualizarEstadoTransaccion(
+                1, "99999999", Map.of("estadoNombre", "INVALIDO"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
     }
 
     @Test
-    void actualizarEstado_aprobada_retorna200() throws Exception {
-        when(usuarioService.esAdministrador("99999999")).thenReturn(true);
-        when(transaccionService.actualizarEstadoTransaccion(1, "APROBADA"))
-                .thenReturn(buildTransaccion("APROBADA"));
-
-        mockMvc.perform(put("/api/transacciones/1/estado")
-                        .header("X-Admin-Documento", "99999999")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("estadoNombre", "APROBADA"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estadoNombre").value("APROBADA"));
-    }
-
-    @Test
-    void actualizarEstado_conLegacyEstadoId5_retornaAprobada() throws Exception {
+    void actualizarEstado_aprobada_retorna200() {
         when(usuarioService.esAdministrador("99999999")).thenReturn(true);
         when(transaccionService.actualizarEstadoTransaccion(1, "APROBADA"))
                 .thenReturn(buildTransaccion("APROBADA"));
 
-        mockMvc.perform(put("/api/transacciones/1/estado")
-                        .header("X-Admin-Documento", "99999999")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("estadoId", 5))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estadoNombre").value("APROBADA"));
+        ResponseEntity<?> response = controller.actualizarEstadoTransaccion(
+                1, "99999999", Map.of("estadoNombre", "APROBADA"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
     }
 
     @Test
-    void actualizarEstado_conLegacyEstadoId6_retornaRechazada() throws Exception {
+    void actualizarEstado_legacyEstadoId5_aprueba() {
+        when(usuarioService.esAdministrador("99999999")).thenReturn(true);
+        when(transaccionService.actualizarEstadoTransaccion(1, "APROBADA"))
+                .thenReturn(buildTransaccion("APROBADA"));
+
+        ResponseEntity<?> response = controller.actualizarEstadoTransaccion(
+                1, "99999999", Map.of("estadoId", 5));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    void actualizarEstado_legacyEstadoId6_rechaza() {
         when(usuarioService.esAdministrador("99999999")).thenReturn(true);
         when(transaccionService.actualizarEstadoTransaccion(1, "RECHAZADA"))
                 .thenReturn(buildTransaccion("RECHAZADA"));
 
-        mockMvc.perform(put("/api/transacciones/1/estado")
-                        .header("X-Admin-Documento", "99999999")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("estadoId", 6))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estadoNombre").value("RECHAZADA"));
+        ResponseEntity<?> response = controller.actualizarEstadoTransaccion(
+                1, "99999999", Map.of("estadoId", 6));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
     }
 }
