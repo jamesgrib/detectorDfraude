@@ -99,9 +99,13 @@ public class TarjetaService {
         return tarjeta;
     }
 
+    private double resolverLimiteCredito(Double limiteCredito) {
+        return limiteCredito != null && limiteCredito > 0 ? limiteCredito : 1_000_000.0;
+    }
+
     private void configurarLimitesSegunTipo(Tarjeta tarjeta, Double limiteCredito) {
         if ("CREDITO".equals(tarjeta.getTipoTarjeta())) {
-            double limite = limiteCredito != null && limiteCredito > 0 ? limiteCredito : 1_000_000.0;
+            double limite = resolverLimiteCredito(limiteCredito);
             tarjeta.setLimiteCredito(limite);
             tarjeta.setCreditoDisponible(limite);
         } else {

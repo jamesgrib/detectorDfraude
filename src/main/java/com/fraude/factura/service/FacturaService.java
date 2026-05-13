@@ -139,16 +139,20 @@ public class FacturaService {
         }
     }
 
-    private void pagarConTarjeta(Factura factura, String numDocumento, Integer tarjetaId) {
-        Tarjeta tarjeta = tarjetaRepository.findById(tarjetaId)
-                .orElseThrow(() -> new IllegalArgumentException("Tarjeta no encontrada"));
-
+    private void validarTarjetaParaPago(Tarjeta tarjeta, String numDocumento) {
         if (!tarjeta.getNumDocumento().equals(numDocumento)) {
             throw new IllegalArgumentException("La tarjeta no pertenece al usuario");
         }
         if (!"ACTIVA".equals(tarjeta.getEstadoNombre())) {
             throw new IllegalArgumentException("La tarjeta no esta activa");
         }
+    }
+
+    private void pagarConTarjeta(Factura factura, String numDocumento, Integer tarjetaId) {
+        Tarjeta tarjeta = tarjetaRepository.findById(tarjetaId)
+                .orElseThrow(() -> new IllegalArgumentException("Tarjeta no encontrada"));
+
+        validarTarjetaParaPago(tarjeta, numDocumento);
 
         double monto = factura.getMonto();
         if ("CREDITO".equals(tarjeta.getTipoTarjeta())) {

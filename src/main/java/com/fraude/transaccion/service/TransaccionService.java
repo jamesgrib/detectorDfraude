@@ -70,12 +70,16 @@ public class TransaccionService {
         }
     }
 
+    private boolean esEstadoFinalValido(String nombre) {
+        return ESTADO_APROBADA.equals(nombre) || ESTADO_RECHAZADA.equals(nombre);
+    }
+
     private void validarTransicionEstado(Transaccion transaccion, String nuevoEstadoNombre) {
         if (!ESTADO_PENDIENTE.equals(transaccion.getEstadoNombre())) {
             throw new IllegalArgumentException(
                     "Solo se pueden validar transacciones en estado PENDIENTE");
         }
-        if (!ESTADO_APROBADA.equals(nuevoEstadoNombre) && !ESTADO_RECHAZADA.equals(nuevoEstadoNombre)) {
+        if (!esEstadoFinalValido(nuevoEstadoNombre)) {
             throw new IllegalArgumentException("Estado invalido. Debe ser APROBADA o RECHAZADA");
         }
     }
