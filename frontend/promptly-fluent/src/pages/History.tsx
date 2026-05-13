@@ -14,6 +14,7 @@ import {
   TransaccionResponse,
 } from "@/services/transaccionService";
 import { toast } from "sonner";
+import { mapEstadoToStatus } from "@/lib/utils";
 
 const HistoryPage = () => {
   const { user } = useAuth();
@@ -39,14 +40,6 @@ const HistoryPage = () => {
   }, [user]);
 
   if (!user) return null;
-
-  const mapearEstado = (
-    estadoNombre?: string,
-  ): "approved" | "rejected" | "pending" => {
-    if (estadoNombre === "APROBADA") return "approved";
-    if (estadoNombre === "RECHAZADA") return "rejected";
-    return "pending";
-  };
 
   return (
     <div className="space-y-6">
@@ -122,7 +115,7 @@ const HistoryPage = () => {
                     })}
                   </TableCell>
                   <TableCell className="text-center">
-                    <StatusBadge status={mapearEstado(txn.estadoNombre)} />
+                    <StatusBadge status={mapEstadoToStatus(txn.estadoNombre)} />
                   </TableCell>
                 </TableRow>
               ))}

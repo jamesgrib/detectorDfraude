@@ -58,17 +58,12 @@ const Transfer = () => {
 
       const result = await crearTransaccion(transaccion);
 
-      const estadoId = result.estadoId;
-      let mensaje = "Transferencia creada";
-
-      if (estadoId === 5) {
-        mensaje = "Transferencia aprobada";
-      } else if (estadoId === 4) {
-        mensaje = "Transferencia pendiente de revision";
-      } else if (estadoId === 6) {
-        mensaje = "Transferencia rechazada";
-      }
-
+      const mensajesPorEstado: Record<number, string> = {
+        5: "Transferencia aprobada",
+        4: "Transferencia pendiente de revision",
+        6: "Transferencia rechazada",
+      };
+      const mensaje = mensajesPorEstado[result.estadoId] ?? "Transferencia creada";
       toast.success(mensaje);
 
       setStep(1);

@@ -4,13 +4,11 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Wallet,
-  TrendingUp,
   AlertCircle,
 } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
+import { mapEstadoToStatus } from "@/lib/utils";
 
 // Definimos la interfaz para las transacciones que vienen de Java
 interface Transaccion {
@@ -30,14 +28,6 @@ const Dashboard = () => {
   const [saldo, setSaldo] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const getStatus = (
-    estadoNombre: string,
-  ): "approved" | "rejected" | "pending" => {
-    if (estadoNombre === "APROBADA") return "approved";
-    if (estadoNombre === "RECHAZADA") return "rejected";
-    return "pending";
-  };
 
   // 1. Cargar transacciones y saldo reales desde el backend
   useEffect(() => {
@@ -248,7 +238,7 @@ const Dashboard = () => {
                       {isOutgoing ? "-" : "+"}$
                       {txn.monto.toLocaleString("es-MX")}
                     </p>
-                    <StatusBadge status={getStatus(txn.estadoNombre)} />
+                    <StatusBadge status={mapEstadoToStatus(txn.estadoNombre)} />
                   </div>
                 </div>
               );
