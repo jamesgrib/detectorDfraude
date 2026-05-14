@@ -76,14 +76,10 @@ public class TarjetaService {
     public Tarjeta aprobarTarjeta(Integer tarjetaId, Double limiteCredito) {
         Tarjeta tarjeta = tarjetaRepository.findById(tarjetaId)
                 .orElseThrow(() -> new IllegalArgumentException(TARJETA_NO_ENCONTRADA));
-
-        if (!ESTADO_PENDIENTE.equals(tarjeta.getEstadoNombre())) {
-            throw new IllegalArgumentException("La tarjeta no está pendiente de aprobación");
-        }
-
+        requireTrue(ESTADO_PENDIENTE.equals(tarjeta.getEstadoNombre()),
+                "La tarjeta no está pendiente de aprobación");
         tarjeta.setEstadoTarjeta(getEstado(ESTADO_ACTIVA));
         configurarLimitesSegunTipo(tarjeta, limiteCredito);
-
         tarjetaRepository.save(tarjeta);
         log.info("Tarjeta {} aprobada. Tipo: {}", tarjetaId, tarjeta.getTipoTarjeta());
         return tarjeta;
@@ -106,11 +102,8 @@ public class TarjetaService {
     public Tarjeta rechazarTarjeta(Integer tarjetaId, String motivo) {
         Tarjeta tarjeta = tarjetaRepository.findById(tarjetaId)
                 .orElseThrow(() -> new IllegalArgumentException(TARJETA_NO_ENCONTRADA));
-
-        if (!ESTADO_PENDIENTE.equals(tarjeta.getEstadoNombre())) {
-            throw new IllegalArgumentException("La tarjeta no está pendiente de aprobación");
-        }
-
+        requireTrue(ESTADO_PENDIENTE.equals(tarjeta.getEstadoNombre()),
+                "La tarjeta no está pendiente de aprobación");
         tarjeta.setEstadoTarjeta(getEstado(ESTADO_RECHAZADA));
         tarjeta.setMotivoRechazo(motivo != null ? motivo : "Solicitud rechazada por el administrador");
         tarjetaRepository.save(tarjeta);
@@ -143,9 +136,7 @@ public class TarjetaService {
     }
 
     private void validarMonto(Double monto) {
-        if (monto == null || monto <= 0) {
-            throw new IllegalArgumentException("El monto debe ser mayor a 0");
-        }
+        requireTrue(monto != null && monto > 0, "El monto debe ser mayor a 0");
     }
 
     private void validarTarjetaParaRecarga(Tarjeta tarjeta, String numDocumento) {
@@ -180,14 +171,15 @@ public class TarjetaService {
         return tarjetaRepository.findAllByOrderByFechaCreacionDesc();
     }
 
+    private void eliminarTarjetaValidada(Tarjeta tarjeta, String numDocumento) {
+        requireTrue(tarjeta.getNumDocumento().equals(numDocumento),
+                "No tienes permiso para eliminar esta tarjeta");
+    }
+
     public void eliminarTarjeta(Integer tarjetaId, String numDocumento) {
         Tarjeta tarjeta = tarjetaRepository.findById(tarjetaId)
                 .orElseThrow(() -> new IllegalArgumentException(TARJETA_NO_ENCONTRADA));
-
-        if (!tarjeta.getNumDocumento().equals(numDocumento)) {
-            throw new IllegalArgumentException("No tienes permiso para eliminar esta tarjeta");
-        }
-
+        eliminarTarjetaValidada(tarjeta, numDocumento);
         tarjeta.setEstadoTarjeta(getEstado(ESTADO_ELIMINADA));
         tarjetaRepository.save(tarjeta);
         log.info("Tarjeta desactivada: {}", tarjetaId);
@@ -195,11 +187,7 @@ public class TarjetaService {
 
     private String generarNumeroTarjeta() {
         StringBuilder sb = new StringBuilder();
-        if (rnd.nextBoolean()) {
-            sb.append("4");
-        } else {
-            sb.append("5").append(1 + rnd.nextInt(5));
-        }
+        sb.append(rnd.nextBoolean() ? "4" : "5" + (1 + rnd.nextInt(5)));
         while (sb.length() < 16) {
             sb.append(rnd.nextInt(10));
         }

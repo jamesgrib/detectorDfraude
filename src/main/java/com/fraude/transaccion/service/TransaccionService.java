@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -89,7 +90,8 @@ public class TransaccionService {
 
     private void aplicarTransferenciaAprobada(Cuenta origen, Cuenta destino,
             BigDecimal monto, Transaccion transaccion) {
-        if (origen.getSaldo().compareTo(monto) < 0) {
+        boolean saldoInsuficiente = origen.getSaldo().compareTo(monto) < 0;
+        if (saldoInsuficiente) {
             log.error("Saldo insuficiente: disponible={}, requerido={}", origen.getSaldo(), monto);
             transaccion.setEstadoTransaccion(getEstado(ESTADO_RECHAZADA));
             return;
@@ -130,12 +132,10 @@ public class TransaccionService {
 
         if (ESTADO_APROBADA.equals(estadoNombre)) {
             aplicarTransferenciaAprobada(origen, destino, BigDecimal.valueOf(transaccion.getMonto()), transaccion);
-        } else {
-            log.info("Transaccion no aprobada (estado={}). Saldos no se actualizan.", estadoNombre);
         }
 
-        String tipoNombre = transaccion.getTipoTransaccion() != null
-                ? transaccion.getTipoTransaccion().getNombre() : null;
+        String tipoNombre = Optional.ofNullable(transaccion.getTipoTransaccion())
+                .map(t -> t.getNombre()).orElse(null);
         transaccion.setTipoTransaccion(getTipo(tipoNombre));
         transaccion.setFechaCreacion(LocalDateTime.now());
 

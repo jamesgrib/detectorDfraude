@@ -110,14 +110,7 @@ public class FacturaService {
 
         validarPropietarioFactura(factura, numDocumento);
         validarFacturaNoPagada(factura);
-
-        if (tarjetaId != null) {
-            pagarConTarjeta(factura, numDocumento, tarjetaId);
-        } else if (numeroCuenta != null) {
-            pagarConCuenta(factura, numDocumento, numeroCuenta);
-        } else {
-            throw new IllegalArgumentException("Debes indicar una tarjeta o una cuenta para pagar");
-        }
+        ejecutarPago(factura, numDocumento, tarjetaId, numeroCuenta);
 
         factura.setEstadoFactura(getEstado("PAGADA"));
         factura.setFechaPago(LocalDateTime.now());
@@ -125,6 +118,17 @@ public class FacturaService {
 
         log.info("Factura {} pagada exitosamente", facturaId);
         return factura;
+    }
+
+    private void ejecutarPago(Factura factura, String numDocumento,
+            Integer tarjetaId, String numeroCuenta) {
+        if (tarjetaId != null) {
+            pagarConTarjeta(factura, numDocumento, tarjetaId);
+        } else if (numeroCuenta != null) {
+            pagarConCuenta(factura, numDocumento, numeroCuenta);
+        } else {
+            throw new IllegalArgumentException("Debes indicar una tarjeta o una cuenta para pagar");
+        }
     }
 
     private void validarPropietarioFactura(Factura factura, String numDocumento) {
