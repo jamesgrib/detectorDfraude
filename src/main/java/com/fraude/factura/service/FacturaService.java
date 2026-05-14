@@ -128,24 +128,24 @@ public class FacturaService {
     }
 
     private void validarPropietarioFactura(Factura factura, String numDocumento) {
-        if (!factura.getNumDocumento().equals(numDocumento)) {
-            throw new IllegalArgumentException("No tienes permiso para pagar esta factura");
-        }
+        requireTrue(factura.getNumDocumento().equals(numDocumento),
+                "No tienes permiso para pagar esta factura");
     }
 
     private void validarFacturaNoPagada(Factura factura) {
-        if ("PAGADA".equals(factura.getEstado())) {
-            throw new IllegalArgumentException("Esta factura ya fue pagada");
-        }
+        requireTrue(!"PAGADA".equals(factura.getEstado()),
+                "Esta factura ya fue pagada");
+    }
+
+    private void requireTrue(boolean condition, String message) {
+        if (!condition) throw new IllegalArgumentException(message);
     }
 
     private void validarTarjetaParaPago(Tarjeta tarjeta, String numDocumento) {
-        if (!tarjeta.getNumDocumento().equals(numDocumento)) {
-            throw new IllegalArgumentException("La tarjeta no pertenece al usuario");
-        }
-        if (!"ACTIVA".equals(tarjeta.getEstadoNombre())) {
-            throw new IllegalArgumentException("La tarjeta no esta activa");
-        }
+        requireTrue(tarjeta.getNumDocumento().equals(numDocumento),
+                "La tarjeta no pertenece al usuario");
+        requireTrue("ACTIVA".equals(tarjeta.getEstadoNombre()),
+                "La tarjeta no esta activa");
     }
 
     private void pagarConTarjeta(Factura factura, String numDocumento, Integer tarjetaId) {
@@ -167,20 +167,16 @@ public class FacturaService {
 
     private void pagarConTarjetaCredito(Tarjeta tarjeta, double monto) {
         double disponible = tarjeta.getCreditoDisponible() != null ? tarjeta.getCreditoDisponible() : 0.0;
-        if (disponible < monto) {
-            throw new IllegalArgumentException(
-                    "Credito disponible insuficiente. Disponible: $" + disponible + " | Factura: $" + monto);
-        }
+        requireTrue(disponible >= monto,
+                "Credito disponible insuficiente. Disponible: $" + disponible + " | Factura: $" + monto);
         tarjeta.setCreditoDisponible(disponible - monto);
         log.info("Pago con tarjeta credito. Credito restante: {}", tarjeta.getCreditoDisponible());
     }
 
     private void pagarConTarjetaDebito(Tarjeta tarjeta, double monto) {
         double saldo = tarjeta.getSaldoTarjeta() != null ? tarjeta.getSaldoTarjeta() : 0.0;
-        if (saldo < monto) {
-            throw new IllegalArgumentException(
-                    "Saldo de tarjeta debito insuficiente. Saldo: $" + saldo + " | Factura: $" + monto);
-        }
+        requireTrue(saldo >= monto,
+                "Saldo de tarjeta debito insuficiente. Saldo: $" + saldo + " | Factura: $" + monto);
         tarjeta.setSaldoTarjeta(saldo - monto);
         log.info("Pago con tarjeta debito. Saldo restante: {}", tarjeta.getSaldoTarjeta());
     }
@@ -188,15 +184,10 @@ public class FacturaService {
     private void pagarConCuenta(Factura factura, String numDocumento, String numeroCuenta) {
         Cuenta cuenta = cuentaRepository.findById(numeroCuenta)
                 .orElseThrow(() -> new IllegalArgumentException("Cuenta no encontrada"));
-
-        if (!cuenta.getNumDocumento().equals(numDocumento)) {
-            throw new IllegalArgumentException("La cuenta no pertenece al usuario");
-        }
-        if (cuenta.getSaldo().compareTo(BigDecimal.valueOf(factura.getMonto())) < 0) {
-            throw new IllegalArgumentException(
-                    "Saldo insuficiente. Saldo: $" + cuenta.getSaldo() + " | Factura: $" + factura.getMonto());
-        }
-
+        requireTrue(cuenta.getNumDocumento().equals(numDocumento),
+                "La cuenta no pertenece al usuario");
+        requireTrue(cuenta.getSaldo().compareTo(BigDecimal.valueOf(factura.getMonto())) >= 0,
+                "Saldo insuficiente. Saldo: $" + cuenta.getSaldo() + " | Factura: $" + factura.getMonto());
         cuenta.setSaldo(cuenta.getSaldo().subtract(BigDecimal.valueOf(factura.getMonto())));
         cuentaRepository.save(cuenta);
         log.info("Factura pagada con saldo de cuenta. Nuevo saldo: {}", cuenta.getSaldo());

@@ -149,25 +149,23 @@ public class TarjetaService {
     }
 
     private void validarTarjetaParaRecarga(Tarjeta tarjeta, String numDocumento) {
-        if (!tarjeta.getNumDocumento().equals(numDocumento)) {
-            throw new IllegalArgumentException("La tarjeta no pertenece al usuario");
-        }
-        if (!ESTADO_ACTIVA.equals(tarjeta.getEstadoNombre())) {
-            throw new IllegalArgumentException("La tarjeta no está activa");
-        }
-        if (!"DEBITO".equals(tarjeta.getTipoTarjeta())) {
-            throw new IllegalArgumentException("Solo se pueden recargar tarjetas de débito");
-        }
+        requireTrue(tarjeta.getNumDocumento().equals(numDocumento),
+                "La tarjeta no pertenece al usuario");
+        requireTrue(ESTADO_ACTIVA.equals(tarjeta.getEstadoNombre()),
+                "La tarjeta no está activa");
+        requireTrue("DEBITO".equals(tarjeta.getTipoTarjeta()),
+                "Solo se pueden recargar tarjetas de débito");
+    }
+
+    private void requireTrue(boolean condition, String message) {
+        if (!condition) throw new IllegalArgumentException(message);
     }
 
     private void validarCuentaParaRecarga(Cuenta cuenta, String numDocumento, BigDecimal monto) {
-        if (!cuenta.getNumDocumento().equals(numDocumento)) {
-            throw new IllegalArgumentException("La cuenta no pertenece al usuario");
-        }
-        if (cuenta.getSaldo().compareTo(monto) < 0) {
-            throw new IllegalArgumentException(
-                    "Saldo insuficiente en la cuenta bancaria. Saldo: $" + cuenta.getSaldo());
-        }
+        requireTrue(cuenta.getNumDocumento().equals(numDocumento),
+                "La cuenta no pertenece al usuario");
+        requireTrue(cuenta.getSaldo().compareTo(monto) >= 0,
+                "Saldo insuficiente en la cuenta bancaria. Saldo: $" + cuenta.getSaldo());
     }
 
     public List<Tarjeta> obtenerTarjetasUsuario(String numDocumento) {
@@ -213,9 +211,13 @@ public class TarjetaService {
         return resolverMarcaNoNulo(numero);
     }
 
+    private static final java.util.Map<Character, String> MARCA_POR_PREFIJO = java.util.Map.of(
+            '4', "VISA"
+    );
+
     private String resolverMarcaNoNulo(String numero) {
         char first = numero.charAt(0);
-        if (first == '4') return "VISA";
+        if (MARCA_POR_PREFIJO.containsKey(first)) return MARCA_POR_PREFIJO.get(first);
         if (esMastercard(numero, first)) return "MASTERCARD";
         if (esAmex(numero, first)) return "AMEX";
         return "UNKNOWN";

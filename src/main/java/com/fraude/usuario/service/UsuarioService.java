@@ -66,22 +66,16 @@ public class UsuarioService {
     }
 
     public boolean esAdministrador(String numDocumento) {
-        if (numDocumento == null || numDocumento.isBlank()) {
-            return false;
-        }
+        if (numDocumento == null || numDocumento.isBlank()) return false;
         return repository.findByNumDocumento(numDocumento.trim())
-                .map(Usuario::getRol)
-                .map(rol -> rol != null ? rol.getNombre() : null)
+                .map(u -> u.getRol() != null ? u.getRol().getNombre() : null)
                 .map(this::esRolAdmin)
                 .orElse(false);
     }
 
     private boolean esRolAdmin(String rolNombre) {
-        if (rolNombre == null || rolNombre.isBlank()) {
-            return false;
-        }
-        String normalizado = rolNombre.trim().toUpperCase();
-        return normalizado.equals("ADMIN") || normalizado.equals("ADMINISTRADOR");
+        if (rolNombre == null || rolNombre.isBlank()) return false;
+        return java.util.Set.of("ADMIN", "ADMINISTRADOR").contains(rolNombre.trim().toUpperCase());
     }
 
     public LoginResponse register(RegisterRequest request) {

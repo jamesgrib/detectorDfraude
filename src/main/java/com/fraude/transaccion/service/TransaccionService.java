@@ -45,9 +45,9 @@ public class TransaccionService {
     private TipoTransaccion getTipo(String nombre) {
         String key = (nombre != null && !nombre.isBlank()) ? nombre.toUpperCase() : "TRANSFERENCIA";
         return tipoTransaccionRepository.findByNombre(key)
-                .orElseGet(() -> tipoTransaccionRepository.findByNombre("TRANSFERENCIA")
-                        .orElseThrow(() -> new IllegalArgumentException(
-                                "Tipo de transaccion no encontrado: " + key)));
+                .or(() -> tipoTransaccionRepository.findByNombre("TRANSFERENCIA"))
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Tipo de transaccion no encontrado: " + key));
     }
 
     private EstadoTransaccion getEstado(String nombre) {
@@ -57,17 +57,16 @@ public class TransaccionService {
     }
 
     private void validarInputsTransaccion(Transaccion transaccion) {
-        if (transaccion.getMonto() == null || transaccion.getMonto() <= 0) {
-            throw new IllegalArgumentException("Monto debe ser mayor a 0");
-        }
-        validarCuentaId(transaccion.getCuentaOrigenId(), "Cuenta origen es requerida");
-        validarCuentaId(transaccion.getCuentaDestinoId(), "Cuenta destino es requerida");
+        requireTrue(transaccion.getMonto() != null && transaccion.getMonto() > 0,
+                "Monto debe ser mayor a 0");
+        requireTrue(transaccion.getCuentaOrigenId() != null && !transaccion.getCuentaOrigenId().isEmpty(),
+                "Cuenta origen es requerida");
+        requireTrue(transaccion.getCuentaDestinoId() != null && !transaccion.getCuentaDestinoId().isEmpty(),
+                "Cuenta destino es requerida");
     }
 
-    private void validarCuentaId(String cuentaId, String mensaje) {
-        if (cuentaId == null || cuentaId.isEmpty()) {
-            throw new IllegalArgumentException(mensaje);
-        }
+    private void requireTrue(boolean condition, String message) {
+        if (!condition) throw new IllegalArgumentException(message);
     }
 
     private boolean esEstadoFinalValido(String nombre) {
@@ -75,13 +74,10 @@ public class TransaccionService {
     }
 
     private void validarTransicionEstado(Transaccion transaccion, String nuevoEstadoNombre) {
-        if (!ESTADO_PENDIENTE.equals(transaccion.getEstadoNombre())) {
-            throw new IllegalArgumentException(
-                    "Solo se pueden validar transacciones en estado PENDIENTE");
-        }
-        if (!esEstadoFinalValido(nuevoEstadoNombre)) {
-            throw new IllegalArgumentException("Estado invalido. Debe ser APROBADA o RECHAZADA");
-        }
+        requireTrue(ESTADO_PENDIENTE.equals(transaccion.getEstadoNombre()),
+                "Solo se pueden validar transacciones en estado PENDIENTE");
+        requireTrue(esEstadoFinalValido(nuevoEstadoNombre),
+                "Estado invalido. Debe ser APROBADA o RECHAZADA");
     }
 
     private void actualizarSaldosCuentas(Cuenta origen, Cuenta destino, BigDecimal monto) {
