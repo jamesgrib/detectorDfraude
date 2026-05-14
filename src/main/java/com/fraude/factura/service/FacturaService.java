@@ -169,10 +169,12 @@ public class FacturaService {
         factura.setTarjetaId(tarjetaId);
     }
 
+    private static final String SEP_FACTURA = " | Factura: $";
+
     private void pagarConTarjetaCredito(Tarjeta tarjeta, double monto) {
         double disponible = tarjeta.getCreditoDisponible() != null ? tarjeta.getCreditoDisponible() : 0.0;
         requireTrue(disponible >= monto,
-                "Credito disponible insuficiente. Disponible: $" + disponible + " | Factura: $" + monto);
+                "Credito disponible insuficiente. Disponible: $" + disponible + SEP_FACTURA + monto);
         tarjeta.setCreditoDisponible(disponible - monto);
         log.info("Pago con tarjeta credito. Credito restante: {}", tarjeta.getCreditoDisponible());
     }
@@ -180,7 +182,7 @@ public class FacturaService {
     private void pagarConTarjetaDebito(Tarjeta tarjeta, double monto) {
         double saldo = tarjeta.getSaldoTarjeta() != null ? tarjeta.getSaldoTarjeta() : 0.0;
         requireTrue(saldo >= monto,
-                "Saldo de tarjeta debito insuficiente. Saldo: $" + saldo + " | Factura: $" + monto);
+                "Saldo de tarjeta debito insuficiente. Saldo: $" + saldo + SEP_FACTURA + monto);
         tarjeta.setSaldoTarjeta(saldo - monto);
         log.info("Pago con tarjeta debito. Saldo restante: {}", tarjeta.getSaldoTarjeta());
     }
@@ -191,7 +193,7 @@ public class FacturaService {
         requireTrue(cuenta.getNumDocumento().equals(numDocumento),
                 "La cuenta no pertenece al usuario");
         requireTrue(cuenta.getSaldo().compareTo(BigDecimal.valueOf(factura.getMonto())) >= 0,
-                "Saldo insuficiente. Saldo: $" + cuenta.getSaldo() + " | Factura: $" + factura.getMonto());
+                "Saldo insuficiente. Saldo: $" + cuenta.getSaldo() + SEP_FACTURA + factura.getMonto());
         cuenta.setSaldo(cuenta.getSaldo().subtract(BigDecimal.valueOf(factura.getMonto())));
         cuentaRepository.save(cuenta);
         log.info("Factura pagada con saldo de cuenta. Nuevo saldo: {}", cuenta.getSaldo());

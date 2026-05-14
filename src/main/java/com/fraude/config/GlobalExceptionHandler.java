@@ -16,39 +16,32 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    private static final String KEY_ERROR   = "error";
+    private static final String KEY_SUCCESS = "success";
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException ex) {
         log.warn("Error de acceso: {}", ex.getReason());
-        return ResponseEntity.status(ex.getStatusCode()).body(Map.of(
-                "error",   ex.getReason() != null ? ex.getReason() : ex.getMessage(),
-                "success", false
-        ));
+        String msg = ex.getReason() != null ? ex.getReason() : ex.getMessage();
+        return ResponseEntity.status(ex.getStatusCode()).body(Map.of(KEY_ERROR, msg, KEY_SUCCESS, false));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Validacion fallida: {}", ex.getMessage());
-        return ResponseEntity.badRequest().body(Map.of(
-                "error",   ex.getMessage(),
-                "success", false
-        ));
+        return ResponseEntity.badRequest().body(Map.of(KEY_ERROR, ex.getMessage(), KEY_SUCCESS, false));
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
         log.error("Error de estado: {}", ex.getMessage());
-        return ResponseEntity.internalServerError().body(Map.of(
-                "error",   ex.getMessage(),
-                "success", false
-        ));
+        return ResponseEntity.internalServerError().body(Map.of(KEY_ERROR, ex.getMessage(), KEY_SUCCESS, false));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
         log.error("Error inesperado: {}", ex.getMessage(), ex);
-        return ResponseEntity.internalServerError().body(Map.of(
-                "error",   "Error interno del servidor",
-                "success", false
-        ));
+        return ResponseEntity.internalServerError().body(
+                Map.of(KEY_ERROR, "Error interno del servidor", KEY_SUCCESS, false));
     }
 }
