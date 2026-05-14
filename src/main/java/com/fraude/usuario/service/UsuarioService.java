@@ -78,8 +78,7 @@ public class UsuarioService {
         return java.util.Set.of("ADMIN", "ADMINISTRADOR").contains(rolNombre.trim().toUpperCase());
     }
 
-    public LoginResponse register(RegisterRequest request) {
-        if (repository.findByNumDocumento(request.getNumDocumento()).isPresent()) {
+    public LoginResponse register(RegisterRequest request) {        if (repository.findByNumDocumento(request.getNumDocumento()).isPresent()) {
             return LoginResponse.builder()
                     .success(false)
                     .mensaje("El número de documento ya está registrado")
@@ -125,6 +124,36 @@ public class UsuarioService {
                 .numeroCuenta(numeroCuenta)
                 .saldo(BigDecimal.ZERO)
                 .rol("USER")
+                .build();
+    }
+
+    /**
+     * CP-002: Asigna un rol a un usuario existente.
+     * Solo puede ser ejecutado por un administrador.
+     */
+    public LoginResponse asignarRol(String numDocumento, String nuevoRol, String adminDocumento) {
+        if (!esAdministrador(adminDocumento)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Solo un administrador puede asignar roles");
+        }
+
+        Usuario usuario = repository.findByNumDocumento(numDocumento)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Usuario no encontrado: " + numDocumento));
+
+        Rol rol = rolRepository.findByNombre(nuevoRol.toUpperCase())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Rol no encontrado: " + nuevoRol));
+
+        usuario.setRolId(rol.getId());
+        repository.save(usuario);
+
+        return LoginResponse.builder()
+                .success(true)
+                .mensaje("Rol asignado exitosamente")
+                .nombre(usuario.getNombre())
+                .rol(rol.getNombre())
                 .build();
     }
 }

@@ -42,4 +42,18 @@ public class UsuarioController {
         }
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * CP-002: Asignar rol a un usuario.
+     * Requiere header X-Admin-Documento con el documento del administrador.
+     */
+    @PutMapping("/{numDocumento}/rol")
+    public ResponseEntity<LoginResponse> asignarRol(
+            @PathVariable String numDocumento,
+            @RequestBody java.util.Map<String, String> body,
+            @RequestHeader(name = "X-Admin-Documento", required = false) String adminDocumento) {
+        String nuevoRol = body.get("rol");
+        LoginResponse response = service.asignarRol(numDocumento, nuevoRol, adminDocumento);
+        return ResponseEntity.ok(response);
+    }
 }
