@@ -1,5 +1,6 @@
 package com.fraude.usuario.dto;
 
+import jakarta.validation.constraints.*;
 import lombok.*;
 
 @Data
@@ -7,7 +8,13 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class LoginRequest {
+
+    @NotBlank
+    @Size(max = 20)
     private String numDocumento;
+
+    @NotBlank
+    @Size(max = 100)
     private String password;
 }
 

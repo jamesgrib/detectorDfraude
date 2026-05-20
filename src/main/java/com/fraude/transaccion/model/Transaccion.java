@@ -2,6 +2,7 @@ package com.fraude.transaccion.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -18,12 +19,19 @@ public class Transaccion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @NotNull
+    @Positive
+    @DecimalMax("999999999.99")
     @Column(name = "monto")
     private Double monto;
 
+    @NotBlank
+    @Size(max = 20)
     @Column(name = "cuenta_origen_id")
     private String cuentaOrigenId;
 
+    @NotBlank
+    @Size(max = 20)
     @Column(name = "cuenta_destino_id")
     private String cuentaDestinoId;
 

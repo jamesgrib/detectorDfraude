@@ -67,6 +67,12 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- BCrypt password hashing -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-crypto</artifactId>
+		</dependency>
+
 		<!-- Stripe SDK -->
 		<dependency>
 			<groupId>com.stripe</groupId>

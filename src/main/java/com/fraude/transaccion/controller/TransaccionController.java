@@ -3,6 +3,7 @@ package com.fraude.transaccion.controller;
 import com.fraude.transaccion.model.Transaccion;
 import com.fraude.transaccion.service.TransaccionService;
 import com.fraude.usuario.service.UsuarioService;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +30,7 @@ public class TransaccionController {
     }
 
     @PostMapping
-    public ResponseEntity<?> procesarTransaccion(@RequestBody Transaccion transaccion) {
+    public ResponseEntity<?> procesarTransaccion(@Valid @RequestBody Transaccion transaccion) {
         log.info("Nueva solicitud de transaccion recibida");
         Transaccion resultado = service.procesarTransaccion(transaccion);
         log.info("Transaccion procesada exitosamente");

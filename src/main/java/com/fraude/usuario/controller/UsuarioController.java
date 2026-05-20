@@ -5,6 +5,7 @@ import com.fraude.usuario.dto.LoginResponse;
 import com.fraude.usuario.dto.RegisterRequest;
 import com.fraude.usuario.model.Usuario;
 import com.fraude.usuario.service.UsuarioService;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,12 +31,12 @@ public class UsuarioController {
     }
 
     @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest loginRequest) {
+    public LoginResponse login(@Valid @RequestBody LoginRequest loginRequest) {
         return service.login(loginRequest);
     }
 
     @PostMapping("/register")
-    public ResponseEntity<LoginResponse> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
         LoginResponse response = service.register(request);
         if (!response.isSuccess()) {
             // CP-001-02: documento duplicado → 409 Conflict

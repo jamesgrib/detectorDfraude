@@ -10,6 +10,7 @@ import com.fraude.usuario.dto.RegisterRequest;
 import com.fraude.usuario.model.Usuario;
 import com.fraude.usuario.model.UsuarioId;
 import com.fraude.usuario.repository.UsuarioRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -23,15 +24,16 @@ public class UsuarioService {
     private final UsuarioRepository repository;
     private final CuentaRepository cuentaRepository;
     private final RolRepository rolRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    // SecureRandom es más apropiado para generar números de cuenta
     private final SecureRandom secureRandom = new SecureRandom();
 
     public UsuarioService(UsuarioRepository repository, CuentaRepository cuentaRepository,
-            RolRepository rolRepository) {
+            RolRepository rolRepository, PasswordEncoder passwordEncoder) {
         this.repository = repository;
         this.cuentaRepository = cuentaRepository;
         this.rolRepository = rolRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<Usuario> getAllUsuarios() {
@@ -45,7 +47,7 @@ public class UsuarioService {
         if (usuario == null) {
             return LoginResponse.builder().success(false).mensaje("Usuario no encontrado").build();
         }
-        if (!usuario.getPasswordHash().equals(loginRequest.getPassword())) {
+        if (!passwordEncoder.matches(loginRequest.getPassword(), usuario.getPasswordHash())) {
             return LoginResponse.builder().success(false).mensaje("Contraseña incorrecta").build();
         }
 
@@ -95,7 +97,7 @@ public class UsuarioService {
                 .nombre(request.getNombre())
                 .apellido(request.getApellido())
                 .email(request.getEmail())
-                .passwordHash(request.getPassword())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .rolId(rolUser.getId())
                 .estadoId(1)
                 .fechaCreacion(LocalDateTime.now())
