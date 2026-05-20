@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -34,6 +35,7 @@ class UsuarioServiceTest {
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private CuentaRepository cuentaRepository;
     @Mock private RolRepository rolRepository;
+    @Mock private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UsuarioService usuarioService;
@@ -77,6 +79,7 @@ class UsuarioServiceTest {
     @Test
     void login_passwordIncorrecta_retornaFallido() {
         when(usuarioRepository.findByNumDocumento("12345678")).thenReturn(Optional.of(usuarioCliente));
+        when(passwordEncoder.matches("wrongpass", "pass123")).thenReturn(false);
         LoginResponse resp = usuarioService.login(new LoginRequest("12345678", "wrongpass"));
         assertThat(resp.isSuccess()).isFalse();
         assertThat(resp.getMensaje()).contains("Contraseña");
@@ -85,6 +88,7 @@ class UsuarioServiceTest {
     @Test
     void login_credencialesCorrectas_retornaExitoso() {
         when(usuarioRepository.findByNumDocumento("12345678")).thenReturn(Optional.of(usuarioCliente));
+        when(passwordEncoder.matches("pass123", "pass123")).thenReturn(true);
         when(cuentaRepository.findByNumDocumento("12345678")).thenReturn(Optional.of(cuenta));
         LoginResponse resp = usuarioService.login(new LoginRequest("12345678", "pass123"));
         assertThat(resp.isSuccess()).isTrue();
@@ -95,6 +99,7 @@ class UsuarioServiceTest {
     @Test
     void login_sinCuenta_retornaDocumentoComoCuenta() {
         when(usuarioRepository.findByNumDocumento("12345678")).thenReturn(Optional.of(usuarioCliente));
+        when(passwordEncoder.matches("pass123", "pass123")).thenReturn(true);
         when(cuentaRepository.findByNumDocumento("12345678")).thenReturn(Optional.empty());
         LoginResponse resp = usuarioService.login(new LoginRequest("12345678", "pass123"));
         assertThat(resp.isSuccess()).isTrue();
@@ -150,6 +155,7 @@ class UsuarioServiceTest {
         when(cuentaRepository.findById(anyString())).thenReturn(Optional.empty());
         when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(cuentaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashedpassword");
 
         RegisterRequest req = RegisterRequest.builder()
                 .numDocumento("55555555").nombre("Nuevo").apellido("Usuario")
