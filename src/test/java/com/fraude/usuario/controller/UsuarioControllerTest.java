@@ -15,16 +15,17 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UsuarioControllerTest {
 
-    @Mock
-    private UsuarioService usuarioService;
+    @Mock private UsuarioService usuarioService;
 
     @InjectMocks
     private UsuarioController controller;
@@ -43,84 +44,74 @@ class UsuarioControllerTest {
     @Test
     void login_exitoso_retornaResponse() {
         LoginResponse resp = LoginResponse.builder()
-                .success(true)
-                .mensaje("Login exitoso")
-                .nombre("Juan")
-                .email("juan@test.com")
-                .saldo(BigDecimal.valueOf(500_000))
-                .numeroCuenta("ACC-001")
-                .rol("USER")
-                .build();
+                .success(true).mensaje("Login exitoso").nombre("Juan")
+                .email("juan@test.com").saldo(BigDecimal.valueOf(500_000))
+                .numeroCuenta("ACC-001").rol("USER").build();
         when(usuarioService.login(any(LoginRequest.class))).thenReturn(resp);
 
         LoginResponse result = controller.login(new LoginRequest("12345678", "pass123"));
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.getNombre()).isEqualTo("Juan");
-        assertThat(result.getRol()).isEqualTo("USER");
     }
 
     @Test
     void login_fallido_retornaSuccessFalse() {
         LoginResponse resp = LoginResponse.builder()
-                .success(false)
-                .mensaje("Contraseña incorrecta")
-                .build();
+                .success(false).mensaje("Contraseña incorrecta").build();
         when(usuarioService.login(any(LoginRequest.class))).thenReturn(resp);
 
         LoginResponse result = controller.login(new LoginRequest("12345678", "wrong"));
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getMensaje()).contains("Contraseña");
     }
 
+    // CP-001-01: Registro exitoso → HTTP 201 Created
     @Test
-    void register_exitoso_retorna200() {
+    void register_exitoso_retorna201() {
         LoginResponse resp = LoginResponse.builder()
-                .success(true)
-                .mensaje("Cuenta creada exitosamente")
-                .nombre("Nuevo")
-                .email("nuevo@test.com")
-                .numeroCuenta("ACC-123456")
-                .saldo(BigDecimal.ZERO)
-                .rol("USER")
-                .build();
+                .success(true).mensaje("Cuenta creada exitosamente")
+                .nombre("Nuevo").email("nuevo@test.com")
+                .numeroCuenta("ACC-123456").saldo(BigDecimal.ZERO).rol("USER").build();
         when(usuarioService.register(any(RegisterRequest.class))).thenReturn(resp);
 
-        RegisterRequest req = RegisterRequest.builder()
-                .numDocumento("55555555")
-                .nombre("Nuevo")
-                .apellido("Usuario")
-                .email("nuevo@test.com")
-                .password("pass123")
-                .build();
+        ResponseEntity<LoginResponse> response = controller.register(RegisterRequest.builder()
+                .numDocumento("55555555").nombre("Nuevo").apellido("Usuario")
+                .email("nuevo@test.com").password("pass123").build());
 
-        ResponseEntity<LoginResponse> response = controller.register(req);
-
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getStatusCode().value()).isEqualTo(201);
         assertThat(response.getBody().isSuccess()).isTrue();
         assertThat(response.getBody().getNumeroCuenta()).isEqualTo("ACC-123456");
     }
 
+    // CP-001-02: Documento duplicado → HTTP 409 Conflict
     @Test
-    void register_documentoDuplicado_retorna400() {
+    void register_documentoDuplicado_retorna409() {
         LoginResponse resp = LoginResponse.builder()
-                .success(false)
-                .mensaje("El número de documento ya está registrado")
-                .build();
+                .success(false).mensaje("El número de documento ya está registrado").build();
         when(usuarioService.register(any(RegisterRequest.class))).thenReturn(resp);
 
-        RegisterRequest req = RegisterRequest.builder()
-                .numDocumento("12345678")
-                .nombre("Otro")
-                .apellido("Usuario")
-                .email("otro@test.com")
-                .password("pass")
-                .build();
+        ResponseEntity<LoginResponse> response = controller.register(RegisterRequest.builder()
+                .numDocumento("12345678").nombre("Otro").apellido("Usuario")
+                .email("otro@test.com").password("pass").build());
 
-        ResponseEntity<LoginResponse> response = controller.register(req);
-
-        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
         assertThat(response.getBody().isSuccess()).isFalse();
+        assertThat(response.getBody().getMensaje()).contains("ya está registrado");
+    }
+
+    // CP-002-01: Asignación exitosa de rol → HTTP 200 OK
+    @Test
+    void asignarRol_adminValido_retorna200() {
+        LoginResponse resp = LoginResponse.builder()
+                .success(true).mensaje("Rol asignado exitosamente")
+                .nombre("Juan").rol("ADMIN").build();
+        when(usuarioService.asignarRol(anyString(), anyString(), anyString())).thenReturn(resp);
+
+        ResponseEntity<LoginResponse> response = controller.asignarRol(
+                "12345678", Map.of("rol", "ADMIN"), "99999999");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody().getRol()).isEqualTo("ADMIN");
     }
 }

@@ -38,9 +38,11 @@ public class UsuarioController {
     public ResponseEntity<LoginResponse> register(@RequestBody RegisterRequest request) {
         LoginResponse response = service.register(request);
         if (!response.isSuccess()) {
-            return ResponseEntity.badRequest().body(response);
+            // CP-001-02: documento duplicado → 409 Conflict
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).body(response);
         }
-        return ResponseEntity.ok(response);
+        // CP-001-01: registro exitoso → 201 Created
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(response);
     }
 
     /**
