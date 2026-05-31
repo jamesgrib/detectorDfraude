@@ -22,7 +22,7 @@ public class ActorFactory {
     public static final String NUM_DOCUMENTO = "numDocumento";
 
     private static final String BASE_URL =
-            System.getProperty("api.base.url", "http://localhost:8080");
+            System.getProperty("api.base.url", "https://fraude-detection-backend.onrender.com");
 
     private ActorFactory() {
         // utility class — no instances

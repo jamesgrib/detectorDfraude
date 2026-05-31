@@ -22,63 +22,64 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class FacturaSteps {
 
+    private static final String ADMIN_DOC    = "12345678";
+    private static final String CUENTA_USER  = "ACC-624489";
+
     private Actor usuario;
     private Integer facturaId;
     private Integer tarjetaId;
 
-    // ── Shared setup ──────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void setupUsuario(String document) {
         OnStage.setTheStage(new OnlineCast());
         usuario = ActorFactory.usuarioBancario(document, "Usuario " + document);
     }
 
-    private void generarYGuardarFactura(String document) {
+    private void generarFactura(String document) {
         usuario.attemptsTo(GenerarFacturasDePrueba.paraDocumento(document));
         facturaId = SerenityRest.lastResponse().jsonPath().getInt("facturas[0].id");
     }
 
-    private Integer crearTarjetaActiva(String document, String tipo, Double limiteCredito) {
-        Actor admin = ActorFactory.administradorBancario("ADMIN001", "Admin");
+    private Integer crearTarjetaActiva(String document, String tipo, Double limite) {
+        Actor admin = ActorFactory.administradorBancario(ADMIN_DOC, "Admin");
         usuario.attemptsTo(
                 SolicitarTarjeta.deTipo(tipo)
-                        .conTitular("Titular Test")
+                        .conTitular("Juan Pablo")
                         .paraDocumento(document)
         );
         Integer id = usuario.recall("tarjetaId");
-        admin.attemptsTo(AprobarTarjeta.conId(id).yLimiteCredito(limiteCredito));
+        admin.attemptsTo(AprobarTarjeta.conId(id).yLimiteCredito(limite));
         return id;
+    }
+
+    private void recargarTarjeta(String document, Integer id) {
+        usuario.attemptsTo(
+                net.serenitybdd.screenplay.rest.interactions.Post
+                        .to("/api/tarjetas/" + id + "/recargar")
+                        .with(req -> req
+                                .header("X-User-Documento", document)
+                                .contentType("application/json")
+                                .body("{\"monto\": 500000, \"numeroCuenta\": \"" + CUENTA_USER + "\"}"))
+        );
     }
 
     // ── Scenario Outline steps ────────────────────────────────────────────────
 
-    @Given("a user with document {string} has a pending invoice")
-    public void aUserWithDocumentHasAPendingInvoice(String document) {
+    @Given("the user {string} has a pending invoice and a {string} card with funds")
+    public void theUserHasAPendingInvoiceAndACardWithFunds(String document, String cardType) {
         setupUsuario(document);
-        generarYGuardarFactura(document);
-    }
-
-    @And("the user has a {string} with sufficient funds")
-    public void theUserHasAWithSufficientFunds(String paymentMethod) {
-        String document = usuario.recall(ActorFactory.NUM_DOCUMENTO);
-        if ("DEBITO".equalsIgnoreCase(paymentMethod)) {
+        generarFactura(document);
+        if ("DEBITO".equalsIgnoreCase(cardType)) {
             tarjetaId = crearTarjetaActiva(document, "DEBITO", null);
-            // Recharge the debit card so it has funds
-            usuario.attemptsTo(
-                    net.serenitybdd.screenplay.rest.interactions.Post
-                            .to("/api/tarjetas/" + tarjetaId + "/recargar")
-                            .with(req -> req
-                                    .header("X-User-Documento", document)
-                                    .contentType("application/json")
-                                    .body("{\"monto\": 500000, \"numeroCuenta\": \"ACC-000001\"}"))
-            );
+            recargarTarjeta(document, tarjetaId);
         } else {
             tarjetaId = crearTarjetaActiva(document, "CREDITO", 2000000.0);
         }
     }
 
-    @When("the user pays the invoice using {string}")
-    public void theUserPaysTheInvoiceUsing(String paymentMethod) {
+    @When("the user pays the invoice with the card")
+    public void theUserPaysTheInvoiceWithTheCard() {
         String document = usuario.recall(ActorFactory.NUM_DOCUMENTO);
         usuario.attemptsTo(
                 PagarFactura.conId(facturaId)
@@ -98,7 +99,14 @@ public class FacturaSteps {
 
     @When("the user requests test invoice generation")
     public void theUserRequestsTestInvoiceGeneration() {
-        String document = usuario.recall(ActorFactory.NUM_DOCUMENTO);
+        // usuario may be null if set up via TarjetaSteps.aUserWithDocumentIsAuthenticated
+        // In that case, use document "7654321" as default
+        String document = (usuario != null)
+                ? usuario.recall(ActorFactory.NUM_DOCUMENTO)
+                : "7654321";
+        if (usuario == null) {
+            setupUsuario(document);
+        }
         usuario.attemptsTo(GenerarFacturasDePrueba.paraDocumento(document));
     }
 
@@ -106,24 +114,12 @@ public class FacturaSteps {
     public void theUserHasAnActiveDebitCardWithSufficientBalance() {
         String document = usuario.recall(ActorFactory.NUM_DOCUMENTO);
         tarjetaId = crearTarjetaActiva(document, "DEBITO", null);
-        usuario.attemptsTo(
-                net.serenitybdd.screenplay.rest.interactions.Post
-                        .to("/api/tarjetas/" + tarjetaId + "/recargar")
-                        .with(req -> req
-                                .header("X-User-Documento", document)
-                                .contentType("application/json")
-                                .body("{\"monto\": 500000, \"numeroCuenta\": \"ACC-000001\"}"))
-        );
+        recargarTarjeta(document, tarjetaId);
     }
 
     @When("the user pays the invoice with the debit card")
     public void theUserPaysTheInvoiceWithTheDebitCard() {
-        String document = usuario.recall(ActorFactory.NUM_DOCUMENTO);
-        usuario.attemptsTo(
-                PagarFactura.conId(facturaId)
-                        .usandoTarjeta(tarjetaId)
-                        .paraDocumento(document)
-        );
+        theUserPaysTheInvoiceWithTheCard();
     }
 
     @And("the user has an active credit card with available credit")
@@ -134,18 +130,19 @@ public class FacturaSteps {
 
     @When("the user pays the invoice with the credit card")
     public void theUserPaysTheInvoiceWithTheCreditCard() {
-        theUserPaysTheInvoiceWithTheDebitCard();
+        theUserPaysTheInvoiceWithTheCard();
     }
 
-    @And("the user has a debit card with zero balance")
-    public void theUserHasADebitCardWithZeroBalance() {
-        String document = usuario.recall(ActorFactory.NUM_DOCUMENTO);
-        // Approve the card but do NOT recharge — saldo stays at 0.0
-        tarjetaId = crearTarjetaActiva(document, "DEBITO", null);
+    @Given("the user {string} has a pending invoice and a {string} card with no balance")
+    public void theUserHasAPendingInvoiceAndACardWithNoBalance(String document, String cardType) {
+        setupUsuario(document);
+        generarFactura(document);
+        // Approve card but do NOT recharge — saldo stays at 0.0
+        tarjetaId = crearTarjetaActiva(document, cardType, null);
     }
 
-    @When("the user attempts to pay the invoice with the debit card")
-    public void theUserAttemptsToPayTheInvoiceWithTheDebitCard() {
-        theUserPaysTheInvoiceWithTheDebitCard();
+    @When("the user attempts to pay the invoice with the card")
+    public void theUserAttemptsToPayTheInvoiceWithTheCard() {
+        theUserPaysTheInvoiceWithTheCard();
     }
 }

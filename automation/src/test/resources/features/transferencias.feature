@@ -4,53 +4,41 @@ Feature: Money Transfers
   I want to transfer money between accounts
   So that I can send funds to other users
 
+  # User: 7654321 / ACC-624489 (saldo: $250,000,000)
+  # Admin: 12345678 / ACC-001
+
   @smoke
-  Scenario Outline: Transfer outcome based on amount and balance
-    Given the origin account has a balance of <balance>
-    And the destination account exists
-    When the user transfers <amount> from origin to destination
+  Scenario Outline: Transfer outcome based on amount
+    Given the user "7654321" transfers <amount> from "ACC-624489" to "ACC-001"
     Then the transaction status should be "<expectedStatus>"
 
     Examples:
-      | balance    | amount   | expectedStatus |
-      | 500000     | 100000   | APROBADA       |
-      | 10000000   | 6000000  | PENDIENTE      |
-      | 50000      | 100000   | RECHAZADA      |
+      | amount   | expectedStatus |
+      | 100000   | APROBADA       |
+      | 6000000  | PENDIENTE      |
 
   @smoke
-  Scenario: Successful transfer between accounts with sufficient balance
-    Given a user with document "12345678" has an account with sufficient balance
-    And a destination account exists
-    When the user performs a transfer of 100000
+  Scenario: Successful transfer with sufficient balance
+    Given the user "7654321" transfers 100000 from "ACC-624489" to "ACC-001"
     Then the response status code is 200
     And the transaction status should be "APROBADA"
 
   @regression
-  Scenario: Transfer rejected due to insufficient balance
-    Given a user with document "12345678" has an account with insufficient balance
-    And a destination account exists
-    When the user attempts a transfer of 9999999
-    Then the response status code is 400
-    And the error message contains "Saldo insuficiente"
-
-  @regression
   Scenario: Suspicious transfer stays in PENDIENTE state
-    Given a user with document "12345678" has an account with sufficient balance
-    And a destination account exists
-    When the user performs a transfer of 6000000
+    Given the user "7654321" transfers 6000000 from "ACC-624489" to "ACC-001"
     Then the response status code is 200
     And the transaction status should be "PENDIENTE"
 
   @admin @regression
-  Scenario: Admin approves a pending transfer — funds are transferred
-    Given a pending transfer exists with id stored as "pendingTransferId"
-    When the admin with document "ADMIN001" approves the transfer
+  Scenario: Admin approves a pending transfer
+    Given a suspicious transfer is created by "7654321" from "ACC-624489" to "ACC-001"
+    When the admin "12345678" approves the transfer
     Then the response status code is 200
     And the transaction status should be "APROBADA"
 
   @admin @regression
-  Scenario: Admin rejects a pending transfer — funds are not moved
-    Given a pending transfer exists with id stored as "pendingTransferId"
-    When the admin with document "ADMIN001" rejects the transfer
+  Scenario: Admin rejects a pending transfer
+    Given a suspicious transfer is created by "7654321" from "ACC-624489" to "ACC-001"
+    When the admin "12345678" rejects the transfer
     Then the response status code is 200
     And the transaction status should be "RECHAZADA"

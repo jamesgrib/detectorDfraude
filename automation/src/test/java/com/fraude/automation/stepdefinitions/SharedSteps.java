@@ -2,35 +2,28 @@ package com.fraude.automation.stepdefinitions;
 
 import com.fraude.automation.questions.ElCampoDeLaRespuesta;
 import com.fraude.automation.questions.ElCodigoDRespuesta;
-import com.fraude.automation.questions.ElMensajeDeLaRespuesta;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Then;
 import net.serenitybdd.rest.SerenityRest;
-import net.serenitybdd.screenplay.Actor;
-import net.serenitybdd.screenplay.actors.OnStage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Reusable step definitions shared across all features.
- * Covers generic HTTP status, field presence, and message assertions.
+ * Uses SerenityRest.lastResponse() directly to avoid dependency on OnStage.
  */
 public class SharedSteps {
 
-    private Actor actor() {
-        return OnStage.theActorInTheSpotlight();
-    }
-
     @Then("the response status code is {int}")
     public void theResponseStatusCodeIs(int expectedCode) {
-        assertThat(ElCodigoDRespuesta.actual().answeredBy(actor()))
+        assertThat(SerenityRest.lastResponse().statusCode())
                 .as("HTTP status code")
                 .isEqualTo(expectedCode);
     }
 
     @And("the response contains field {string} with value {string}")
     public void theResponseContainsFieldWithValue(String field, String expectedValue) {
-        String actual = ElCampoDeLaRespuesta.llamado(field).answeredBy(actor());
+        String actual = SerenityRest.lastResponse().jsonPath().getString(field);
         assertThat(actual)
                 .as("Field '%s' in response", field)
                 .isEqualTo(expectedValue);
@@ -38,7 +31,7 @@ public class SharedSteps {
 
     @And("the response contains field {string}")
     public void theResponseContainsField(String field) {
-        String actual = ElCampoDeLaRespuesta.llamado(field).answeredBy(actor());
+        String actual = SerenityRest.lastResponse().jsonPath().getString(field);
         assertThat(actual)
                 .as("Field '%s' should be present in response", field)
                 .isNotNull();

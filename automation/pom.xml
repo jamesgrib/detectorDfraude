@@ -149,6 +149,8 @@
                     <includes>
                         <include>**/*Runner.java</include>
                     </includes>
+                    <!-- Disable retries so each scenario runs exactly once -->
+                    <rerunFailingTestsCount>0</rerunFailingTestsCount>
                 </configuration>
             </plugin>
 
