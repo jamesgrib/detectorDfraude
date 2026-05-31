@@ -10,22 +10,13 @@ import static io.cucumber.junit.platform.engine.Constants.GLUE_PROPERTY_NAME;
 import static io.cucumber.junit.platform.engine.Constants.PLUGIN_PROPERTY_NAME;
 
 /**
- * Main test runner — executes all @smoke, @regression and @admin scenarios
- * across all features.
- *
- * Useful tag filters via CLI:
- *   -Dcucumber.filter.tags="@smoke"
- *   -Dcucumber.filter.tags="@regression"
- *   -Dcucumber.filter.tags="@admin"
- *   -Dcucumber.filter.tags="@smoke or @regression"
- *
- * Isolated runners:
- *   TransferenciasRunner  → only transferencias.feature @smoke
- *   TarjetasRunner        → only tarjetas.feature @smoke
+ * Isolated runner for the cards feature.
+ * Runs only @smoke scenarios from tarjetas.feature.
+ * Use: mvnw -f automation/pom.xml test -Dtest=TarjetasRunner
  */
 @Suite
 @IncludeEngines("cucumber")
-@SelectClasspathResource("features")
+@SelectClasspathResource("features/tarjetas.feature")
 @ConfigurationParameter(
     key = PLUGIN_PROPERTY_NAME,
     value = "pretty,net.serenitybdd.cucumber.core.plugin.SerenityReporterParallel"
@@ -36,6 +27,6 @@ import static io.cucumber.junit.platform.engine.Constants.PLUGIN_PROPERTY_NAME;
 )
 @ConfigurationParameter(
     key = FILTER_TAGS_PROPERTY_NAME,
-    value = "@smoke or @regression or @admin"
+    value = "@smoke"
 )
-public class CucumberTestRunner {}
+public class TarjetasRunner {}
