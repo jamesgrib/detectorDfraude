@@ -76,6 +76,39 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
+  e2e:
+    name: E2E Automation (Screenplay)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-e2e-${{ hashFiles('automation/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-e2e-
+
+      - name: Ejecutar tests Serenity BDD
+        working-directory: automation
+        run: ./mvnw clean verify
+
+      - name: Subir reporte Serenity
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: serenity-report
+          path: automation/target/site/serenity/
+          retention-days: 30
+
   sonarcloud:
     name: SonarCloud Analysis
     runs-on: ubuntu-latest
