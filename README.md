@@ -9,6 +9,9 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 
+[![CI - Fraude Detection](https://github.com/jamesgrib/detectorDfraude/actions/workflows/ci.yml/badge.svg)](https://github.com/jamesgrib/detectorDfraude/actions/workflows/ci.yml)
+[![Serenity E2E Report](https://img.shields.io/badge/Serenity_Report-E2E_Tests-brightgreen?style=flat&logo=github)](https://jamesgrib.github.io/detectorDfraude/)
+
 **Plataforma bancaria digital fullstack para gestión de cuentas, tarjetas, facturas y transferencias en tiempo real.**
 
 </div>
