@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Random;
@@ -25,7 +26,7 @@ import java.util.UUID;
 @Slf4j
 public class FacturaService {
 
-    private final Random rnd = new Random();
+    private final Random rnd = new SecureRandom();
 
     private final FacturaRepository facturaRepository;
     private final TarjetaRepository tarjetaRepository;

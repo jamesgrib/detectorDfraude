@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Random;
@@ -28,7 +29,7 @@ public class TarjetaService {
     private static final String ESTADO_ELIMINADA = "ELIMINADA";
     private static final String TARJETA_NO_ENCONTRADA = "Tarjeta no encontrada";
 
-    private final Random rnd = new Random();
+    private final Random rnd = new SecureRandom();
 
     private final TarjetaRepository tarjetaRepository;
     private final CuentaRepository cuentaRepository;
